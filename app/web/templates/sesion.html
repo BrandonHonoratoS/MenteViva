@@ -1,0 +1,54 @@
+{% extends "base.html" %}{% block title %}{{ 'Diagnóstico con Elena' if s.tipo == 'diagnostico' else hab.nombre }}{% endblock %}
+{% block subtitulo %}{% if s.tipo == 'diagnostico' %}Entrevista por competencias · Elena Ríos{% else %}Nivel {{ s.nivel }}{% if s.competencia %} · {{ s.competencia }}{% endif %} · con {{ avatar.nombre }}{% endif %}{% endblock %}
+{% block content %}
+{% set esc = s.escenario or {} %}
+<div class="chat" id="sesion" data-id="{{ s.id }}" data-turnos="{{ s.turnos }}" data-max="{{ turnos_max }}" data-estado="{{ s.estado }}" data-avatar="{{ avatar.nombre }}" data-inicio="{{ s.inicio }}" data-duracion="{{ duracion }}" data-salida="{{ '/diagnostico' if s.tipo == 'diagnostico' else '/hoy' }}">
+  <aside class="side">
+    <div class="card hero">
+      <div class="orb-wrap"><div class="orb" id="orb" style="--c1:{{ avatar.color }};--c2:#06B6D4"></div><b>{{ avatar.nombre }}</b><span class="muted small">{{ esc.personaje or avatar.rol }}</span></div>
+      <hr>
+      <div class="row between"><span class="muted small">Tiempo</span><span class="timer" id="timer">0:00</span></div>
+      <div class="row between"><span class="muted small">Turnos</span><b id="turnos">{{ s.turnos }} / {{ turnos_max }}</b></div>
+      <div class="muted tiny">Sugerido: ~{{ duracion }} min. Escribe <b>Fin</b> para cerrar cuando quieras.</div>
+    </div>
+    <div class="card">
+      {% if s.agente == 'elena' %}
+      <div class="cap">Fase de la entrevista</div>
+      <div class="phases" id="fases">{% for f in ['rapport','encuadre','desarrollo','profundizacion','cierre','fin'] %}<span></span>{% endfor %}</div>
+      <div class="row between mt"><span class="muted small">Fase</span><b id="fase-v">rapport</b></div>
+      {% if s.tipo == 'diagnostico' %}<div class="row between"><span class="muted small">Historias STAR</span><b id="hist-v">0</b></div>{% endif %}
+      {% endif %}
+      <div class="meter mt"><div class="row between"><span class="muted small">Presión del escenario</span><b id="tension-v">0</b></div><div class="bar" id="tension"><i style="width:0"></i></div></div>
+      {% if s.agente == 'celeste' %}<div class="row between mt"><span class="muted small">Etapa que detecta Celeste</span><b id="etapa-v">—</b></div>{% endif %}
+    </div>
+    <div class="card">
+      <div class="cap">{{ 'Objetivo de la entrevista' if s.tipo == 'diagnostico' else 'Objetivo de la sesión' }}</div>
+      <p>{{ s.objetivo or 'Conocer tus competencias con ejemplos reales.' }}</p>
+      {% if esc.encuadre %}<div class="cap mt">Encuadre</div><p class="small">{{ esc.encuadre }}</p>{% endif %}
+      {% if esc.situacion %}<div class="cap mt">Situación</div><p class="small">{{ esc.situacion }}</p>{% endif %}
+      {% if esc.formato %}<span class="chip">{{ NOMBRE_FORMATO.get(esc.formato, esc.formato) }}</span>{% endif %}
+      {% if s.agente == 'celeste' %}<div class="cap mt">Recuerda</div><p class="small muted">Pregunta antes de presentar. Valida → aísla → diagnostica → técnica. Escribe <b>(silencio)</b> para usar el silencio activo tras una pregunta de cierre.</p>{% endif %}
+    </div>
+    {% if propia and s.estado == 'en_curso' %}
+    <div class="row"><button class="btn" id="terminar" type="button">Terminar y analizar</button><button class="btn ghost sm" id="descartar" type="button">Descartar</button></div>
+    {% endif %}
+  </aside>
+  <section class="card panel">
+    <div class="msgs" id="msgs">
+      {% for msg in mensajes %}{% if msg.rol != 'sistema' or True %}
+      <div class="msg {{ msg.rol }}">{% if msg.rol == 'avatar' %}<span class="who">{{ avatar.nombre }}</span>{% elif msg.rol == 'usuario' %}<span class="who">Tú</span>{% endif %}{{ msg.texto }}</div>
+      {% endif %}{% endfor %}
+    </div>
+    {% if propia %}
+    <div id="analizando" class="orb-wrap" style="display:{{ 'flex' if s.estado in ('analizando','error') else 'none' }};padding:30px 0">
+      {% if s.estado == 'error' %}<div class="alert err">{{ s.error }}</div>{% else %}<div class="orb thinking" style="--c1:{{ avatar.color }};--c2:#A855F7"></div><b>Analizando tu sesión…</b><span class="muted small">{{ avatar.nombre }} está revisando la conversación completa con evidencia. Tarda menos de un minuto.</span>{% endif %}
+    </div>
+    <div class="composer" id="composer" style="display:{{ 'flex' if s.estado == 'en_curso' else 'none' }}">
+      <textarea id="texto" placeholder="Escribe tu respuesta… (Enter envía, Shift+Enter salto de línea)"></textarea>
+      <button class="btn primary" id="enviar" type="button">Enviar</button>
+    </div>
+    {% if s.agente == 'celeste' and s.estado == 'en_curso' %}<div class="row mt"><span class="muted tiny">Atajos:</span><button class="btn sm" data-rapido="(silencio)" type="button">(silencio)</button><button class="btn sm" data-rapido="Fin" type="button">Fin</button></div>{% endif %}
+    {% else %}<div class="alert info">Vista de RRHH: transcripción de solo lectura.</div>{% endif %}
+  </section>
+</div>
+{% endblock %}

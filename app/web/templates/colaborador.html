@@ -1,0 +1,39 @@
+{% extends "base.html" %}{% block title %}{{ x.nombre }}{% endblock %}
+{% block subtitulo %}{{ x.puesto or NOMBRES_ROL[x.rol] }} · {{ x.area_nombre or 'sin área' }} · {{ x.email }}{% endblock %}
+{% block acciones %}{% if puede_evaluar %}<a class="btn sm primary" href="/evaluar/{{ x.id }}">Evaluar este mes</a>{% endif %}<a class="btn sm" href="/colaborador/{{ x.id }}/ficha.pdf">{{ m.icon('download') }} Ficha PDF</a>{% endblock %}
+{% block content %}
+<div class="grid g4 mb">
+  <div class="card stat"><span class="l">Score reciente</span><span class="v">{{ f.score_promedio|num }}</span><span class="d {{ 'up' if (f.tendencia or 0) >= 0 else 'down' }}">{% if f.tendencia is not none %}{{ '+' if f.tendencia >= 0 }}{{ f.tendencia }} vs. anteriores{% else %}sin tendencia aún{% endif %}</span></div>
+  <div class="card stat"><span class="l">Sesiones</span><span class="v">{{ f.sesiones }}</span><span class="d muted">racha {{ f.racha }} sem · última {{ f.ultima_actividad or 'nunca' }}</span></div>
+  <div class="card stat"><span class="l">Plan</span><span class="v">{{ f.plan.completadas }}<small>/{{ f.plan.total }}</small></span><span class="d muted">sesiones completadas</span></div>
+  <div class="card stat"><span class="l">Diagnóstico</span><span class="v" style="font-size:1.3rem">{{ perfil.estado }}</span><span class="d muted">score inicial {{ f.score_inicial|num }}</span></div>
+</div>
+<div class="grid g-2-1">
+  <div class="stack">
+    <div class="card"><h2>Niveles</h2><div class="grid g3">{% for h, n in f.niveles_detalle.items() %}<div><div class="muted tiny">{{ h|hab }}</div><span class="badge-level">{{ n.nivel }}</span><div class="muted tiny">inicial {{ n.score_inicial|num }} · actual {{ n.score_actual|num }} · {{ n.sesiones }} ses.</div>
+      {% if h == 'ruta_dm' and n.competencias %}<div class="mt">{% for c, d in n.competencias.items() %}<span class="chip {{ 'mint' if d.score >= 9 else ('aqua' if d.score >= 7 else ('amber' if d.score >= 5 else 'rose')) }}" title="{{ d.dominio }}">{{ c }} {{ d.score }}</span> {% endfor %}</div>{% endif %}</div>{% endfor %}</div></div>
+    <div class="card"><h2>Evolución</h2><div style="height:220px">{% if f.serie %}<canvas data-line='{{ {"labels": f.serie|map(attribute="fecha")|list, "values": f.serie|map(attribute="score")|list}|tojson_safe }}'></canvas>{% else %}<div class="empty">Sin sesiones de práctica.</div>{% endif %}</div></div>
+    {% if kpis.ventas or kpis.entrevistas or kpis.ruta_dm %}
+    <div class="grid g3">{% for h, r in kpis.items() if r %}<div class="card"><h3>{{ h|hab_corto }} · últimos KPIs</h3><div style="height:200px"><canvas data-radar='{{ {"labels": r|map(attribute="nombre")|list, "values": r|map(attribute="score")|list}|tojson_safe }}'></canvas></div></div>{% endfor %}</div>
+    {% endif %}
+    <div class="card"><h2>Sesiones</h2>
+      <table><thead><tr><th>Fecha</th><th>Habilidad</th><th>Nivel</th><th>Objetivo</th><th>Estado</th><th class="tright">Score</th></tr></thead><tbody>
+      {% for s in sesiones %}<tr class="{{ 'link' if s.estado == 'completada' }}" {% if s.estado == 'completada' %}data-href="/sesion/{{ s.id }}/reporte"{% endif %}><td>{{ s.inicio|fecha_corta }}</td><td>{{ s.habilidad|hab_corto }}</td><td>{{ s.nivel }}{% if s.competencia %} · {{ s.competencia }}{% endif %}</td><td class="muted small">{{ (s.objetivo or '')[:60] }}</td><td><span class="chip {{ {'completada':'mint','en_curso':'amber','analizando':'aqua','descartada':'gris','error':'rose'}[s.estado] }}">{{ s.estado }}</span></td><td class="tright">{{ m.sem(s.score_global) }}</td></tr>{% else %}<tr><td colspan="6" class="empty">Sin sesiones.</td></tr>{% endfor %}
+      </tbody></table></div>
+    {% for r in roadmaps %}
+    <div class="card"><div class="row between"><h2>{{ r.habilidad|hab }} <span class="chip {{ {'activo':'mint','propuesto':'amber','pausado':'gris','completado':'aqua','rechazado':'rose'}[r.estado] }}">{{ r.estado }}</span></h2><span class="muted small">{{ r.completadas }}/{{ r.total }} · v{{ r.version }}</span></div>
+      <p class="small">{{ r.objetivo }}</p><p class="muted tiny">{{ r.razon }}</p>
+      <div class="timeline mt">{% for it in r['items'] %}<div class="tl-item {{ 'done' if it.estado == 'completada' }} {{ 'refuerzo' if it.tipo == 'refuerzo' }}"><span class="chip {{ 'amber' if it.tipo == 'refuerzo' }}">S{{ it.semana }} · {{ it.nivel }}{% if it.competencia %} · {{ it.competencia }}{% endif %}</span> <span class="small">{{ it.objetivo }}</span>{% if it.sesion_id %} <a class="small" href="/sesion/{{ it.sesion_id }}/reporte">reporte</a>{% endif %}</div>{% endfor %}</div></div>
+    {% endfor %}
+  </div>
+  <div class="stack">
+    {% if diag %}
+    <div class="card"><h2>Diagnóstico de Elena</h2><p class="small">{{ diag.resumen_ejecutivo }}</p><div class="cap mt">Fortalezas</div>{% for ff in diag.fortalezas %}<div class="small"><b>{{ ff.habilidad }}</b></div>{% endfor %}<div class="cap mt">Oportunidades</div>{% for o in diag.oportunidades %}<div class="small"><b>{{ o.habilidad }}</b> — {{ o.micro_practica }}</div>{% endfor %}
+      <div style="height:220px" class="mt"><canvas data-radar='{{ {"labels": diag.competencias|map(attribute="nombre")|list, "values": diag.competencias|map(attribute="nivel")|list, "max": 5}|tojson_safe }}'></canvas></div></div>
+    {% endif %}
+    <div class="card"><h2>Lecturas del Analista</h2><ul class="list">{% for a in analisis %}<li><div>{% if a.contenido.riesgo %}<span class="chip {{ {'bajo':'mint','medio':'amber','alto':'rose'}[a.contenido.riesgo] }}">riesgo {{ a.contenido.riesgo }}</span>{% endif %} <b class="small">{{ a.titulo }}</b><div class="small">{{ a.contenido.lectura or a.contenido.resumen }}</div>{% if a.contenido.recomendacion_lider %}<div class="muted tiny"><b>Para ti:</b> {{ a.contenido.recomendacion_lider }}</div>{% endif %}<div class="soft tiny">{{ a.creado_en|fecha }}</div></div></li>{% else %}<li class="muted small">Aún sin lecturas.</li>{% endfor %}</ul></div>
+    <div class="card"><h2>Evaluaciones</h2>{% for e in evaluaciones %}<div class="row between small"><span>{{ e.tipo }} · {{ e.periodo }} · {{ e.evaluador_nombre }}</span><b>{{ e.promedio }}/5</b></div>{% else %}<div class="muted small">Sin evaluaciones. {% if puede_evaluar %}<a href="/evaluar/{{ x.id }}">Registra la de este mes.</a>{% endif %}</div>{% endfor %}</div>
+    {% if propuestas %}<div class="card"><h2>Propuestas del Analista</h2>{% for p in propuestas %}<div class="small mb"><span class="chip {{ {'pendiente':'amber','aprobada':'mint','rechazada':'rose','atendida':'gris'}[p.estado] }}">{{ p.estado }}</span> {{ p.titulo }}</div>{% endfor %}</div>{% endif %}
+  </div>
+</div>
+{% endblock %}

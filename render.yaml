@@ -1,0 +1,50 @@
+# Blueprint de Render · Mente Viva (un solo servicio web + disco persistente)
+# Costo estimado: Starter 7 USD/mes + disco 1 GB 0.25 USD/mes. Workspace Hobby (gratis).
+services:
+  - type: web
+    name: mente-viva
+    runtime: python
+    plan: starter
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
+    healthCheckPath: /salud
+    autoDeploy: true
+    disk:
+      name: datos-mente-viva
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATA_DIR
+        value: /data
+      - key: TZ
+        value: America/Mexico_City
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SCHEDULE_ENABLED
+        value: "1"
+      - key: PRESUPUESTO_MXN
+        value: "500"
+      - key: TIPO_CAMBIO_MXN_USD
+        value: "20"
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash
+      - key: GEMINI_MODEL_LIGERO
+        value: gemini-3.5-flash-lite
+      # Se capturan a mano en el panel de Render (sync: false = no se guardan en el repo):
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SUPERADMIN_EMAIL
+        sync: false
+      - key: SUPERADMIN_PASSWORD
+        sync: false
+      - key: EMPRESA_INICIAL
+        sync: false
+      - key: RRHH_INICIAL_EMAIL
+        sync: false
+      - key: RRHH_INICIAL_PASSWORD
+        sync: false

@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% block title %}Entrenar{% endblock %}
+{% block subtitulo %}Catálogo de habilidades · práctica libre o desde tu plan{% endblock %}
+{% block content %}
+{% if perfil.estado != 'completo' %}<div class="alert info mb">Completa tu diagnóstico con Elena para desbloquear las prácticas personalizadas.</div>{% endif %}
+<div class="grid g3">
+{% for h in habilidades %}{% set av = AVATARES[h.agente] %}{% set cat = (CATEGORIAS|selectattr('id','equalto',h.categoria)|list)[0] %}
+<div class="cat">
+  <div class="ico" style="background:{{ cat.color }}18">{{ cat.icono }}</div>
+  <div style="flex:1">
+    <div class="row between"><b>{{ h.nombre }}</b>{% if h.personalizada %}<span class="chip aqua">personalizado · {{ h.empresa }}</span>{% endif %}</div>
+    <div class="muted small">{{ cat.nombre }} · con {{ av.nombre }} ({{ h.rol_avatar }})</div>
+    <p class="small">{{ h.descripcion }}</p>
+    <div class="row between mt"><span>{{ m.nivel_badge(niveles, h.id) }}</span>{% if perfil.estado == 'completo' and not en_curso %}<a class="btn primary sm" href="/entrenar/{{ h.id }}">Entrenar</a>{% endif %}</div>
+  </div>
+</div>
+{% endfor %}
+</div>
+<div class="section-title"><h2>Próximamente más habilidades</h2><span class="muted small">{{ proximamente|length }} categorías · {{ proximamente|sum(attribute='escenarios') }} escenarios en diseño</span></div>
+<div class="grid g3">
+{% for c in proximamente %}<div class="cat soon"><div class="ico" style="background:{{ c.color }}18">{{ c.icono }}</div><div><b>{{ c.nombre }}</b><div class="muted small">{{ c.escenarios }} escenarios · 3 niveles</div><span class="chip gris mt">Próximamente</span></div></div>{% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends "base.html" %}{% block title %}Reporte de sesión{% endblock %}
+{% block subtitulo %}{{ hab.nombre }} · nivel {{ s.nivel }}{% if s.competencia %} · {{ s.competencia }}{% endif %} · {{ s.inicio|fecha }} · {{ minutos }} min · {{ s.turnos }} turnos{% if not propia %} · {{ s.usuario_nombre }}{% endif %}{% endblock %}
+{% block acciones %}<a class="btn sm" href="/sesion/{{ s.id }}/reporte.pdf">{{ m.icon('download') }} PDF</a>{% endblock %}
+{% block content %}
+{% set reco = res.recomendacion or res.siguiente_paso or {} %}
+<div class="grid g-2-1">
+  <div class="stack">
+    <div class="card hero">
+      <div class="row" style="gap:26px">
+        <div class="orb-wrap"><div class="orb" style="--c1:{{ avatar.color }};--c2:#06B6D4"></div><b>{{ avatar.nombre }}</b><span class="muted tiny">modo coach</span></div>
+        <div style="flex:1;min-width:240px">
+          <div class="row" style="gap:22px;align-items:flex-end">
+            <div><div class="cap">Score global</div><div class="score-big grad-text">{{ s.score_global|round(0)|int }}</div><span class="muted small">/100 {% if anterior and anterior.score_global is not none %}· antes {{ anterior.score_global|round(0)|int }} <b class="{{ 'up' if s.score_global >= anterior.score_global else 'down' }}">({{ '+' if s.score_global >= anterior.score_global }}{{ (s.score_global - anterior.score_global)|round(0)|int }})</b>{% endif %}</span></div>
+            {% if res.nivel_dominio %}<div><div class="cap">Dominio</div><span class="badge-level">{{ res.nivel_dominio }}</span><div class="muted small">{{ res.score_global }}/10</div></div>{% endif %}
+            {% if res.evidencia %}<div><div class="cap">Cierre</div><span class="chip {{ {'venta':'mint','siguiente_paso':'aqua','sin_cierre':'gris','fallido_por_ceder':'rose'}[res.evidencia.cierre] }}">{{ res.evidencia.cierre|replace('_',' ') }}</span></div>{% endif %}
+          </div>
+          <p class="mt">{{ res.resumen }}</p>
+        </div>
+      </div>
+    </div>
+
+    {% if res.kpis %}
+    <div class="card">
+      <h2>Puntuación por KPI</h2>
+      {% for k in res.kpis %}{% set d = kpis_def.get(k.id, {}) %}
+      <div class="kpi-row">
+        <div><b>{{ k.id }} · {{ d.nombre or '' }}</b><div class="muted tiny">peso {{ pesos.get(k.id, 0) }} %</div></div>
+        <div><div class="bar"><i style="width:{{ k.score }}%"></i></div><div class="small mt" style="margin-top:6px"><b>Evidencia:</b> {{ k.evidencia }}</div><div class="small"><span class="up">✓</span> {{ k.bien }}</div><div class="small"><span class="down">→</span> {{ k.mejora }}</div></div>
+        <div>{{ m.sem(k.score) }}</div>
+      </div>{% endfor %}
+      {% if res.metrica_etapa_debil %}<div class="alert info mt">Etapa débil declarada: {{ res.metrica_etapa_debil }}</div>{% endif %}
+    </div>
+    {% endif %}
+
+    {% if res.subdimensiones %}
+    <div class="card">
+      <h2>Sub-dimensiones de {{ s.competencia }}</h2>
+      <div class="grid g-1-2">
+        <div style="height:240px"><canvas data-radar='{{ {"labels": res.subdimensiones|map(attribute="nombre")|list, "values": res.subdimensiones|map(attribute="score")|list, "max": 10}|tojson_safe }}'></canvas></div>
+        <div>{% for sd in res.subdimensiones %}<div class="kpi-row" style="grid-template-columns:140px 1fr 50px"><b>{{ sd.nombre }}</b><span class="small">{{ sd.evidencia }}</span><span class="chip">{{ sd.score }}/10</span></div>{% endfor %}
+        <p class="small mt">{{ res.justificacion }}</p></div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="grid g2">
+      <div class="card"><h2>Fortalezas</h2>{% for f in res.fortalezas %}<div class="mb"><b>{{ f.habilidad }}</b><div class="small">“{{ f.evidencia }}”</div><div class="muted small">{{ f.por_que_importa }}</div></div>{% endfor %}</div>
+      <div class="card"><h2>{{ 'Brechas para ascender' if res.brechas else 'Áreas de oportunidad' }}</h2>
+        {% for o in res.oportunidades %}<div class="mb"><b>{{ o.habilidad }}</b><div class="small">{{ o.evidencia }}</div><div class="muted small">{{ o.impacto }}</div><div class="chip aqua mt" style="margin-top:6px">Micro-práctica: {{ o.micro_practica }}</div></div>{% endfor %}
+        {% for b in res.brechas %}<div class="mb"><b>{{ b.brecha }}</b><div class="small">{{ b.evidencia }}</div><div class="muted small">{{ b.impacto_siguiente_nivel }}</div><div class="soft tiny">Causa probable: {{ b.causa_probable }}</div></div>{% endfor %}
+      </div>
+    </div>
+
+    {% if res.momentos_clave %}
+    <div class="card"><h2>Momentos clave</h2>
+      <div class="timeline">{% for mo in res.momentos_clave %}<div class="tl-item {{ 'done' if mo.tipo == 'destacó' else 'refuerzo' }}"><span class="chip {{ 'mint' if mo.tipo == 'destacó' else 'amber' }}">Turno {{ mo.turno }} · {{ mo.tipo }}</span><div class="mt" style="margin-top:6px">{{ mo.que_paso }}</div><div class="muted small">{{ mo.que_habria_cambiado }}</div></div>{% endfor %}</div>
+    </div>
+    {% endif %}
+    {% if res.momento_clave %}
+    <div class="card"><h2>El momento clave</h2><p>{{ res.momento_clave.que_hizo }}</p><p class="small"><b>Alternativa:</b> {{ res.momento_clave.alternativa }}</p><p class="small"><b>Qué habría cambiado:</b> {{ res.momento_clave.que_habria_cambiado }}</p></div>
+    {% endif %}
+
+    <div class="grid g2">
+      <div class="card"><h2>Plan de acción</h2><ul class="list">{% for p in res.plan_accion %}<li><span class="n">{{ loop.index }}</span><div><b>{{ p.paso }}</b>{% if p.como_practicar_esta_semana %}<div class="small">{{ p.como_practicar_esta_semana }}</div>{% endif %}<div class="muted small">Medir: {{ p.como_medir or p.senal_de_logro }}</div></div></li>{% endfor %}</ul></div>
+      <div class="card"><h2>Tips</h2><ul class="list">{% for t in res.tips %}<li><span class="n">✦</span><div class="small">{{ t }}</div></li>{% endfor %}</ul>
+        {% if res.blind_spot %}<div class="alert warn mt"><b>Blind spot:</b> {{ res.blind_spot }}</div>{% endif %}
+        {% if res.pregunta_para_llevarse %}<p class="mt"><i>Para llevarte: {{ res.pregunta_para_llevarse }}</i></p>{% endif %}</div>
+    </div>
+
+    {% if res.evidencia %}
+    <div class="card"><h2>Evidencia objetiva de la sesión</h2>
+      <div class="grid g4">
+        <div class="stat"><span class="v">{{ res.evidencia.tecnicas_usadas|length }}</span><span class="l">técnicas usadas</span><span class="d muted">{{ res.evidencia.tecnicas_usadas|map(attribute='id')|unique|join(', ') or '—' }}</span></div>
+        <div class="stat"><span class="v">{{ res.evidencia.spin.I + res.evidencia.spin.N }}<small>/{{ res.evidencia.spin.S + res.evidencia.spin.P + res.evidencia.spin.I + res.evidencia.spin.N }}</small></span><span class="l">preguntas SPIN I+N</span><span class="d muted">S {{ res.evidencia.spin.S }} · P {{ res.evidencia.spin.P }} · I {{ res.evidencia.spin.I }} · N {{ res.evidencia.spin.N }}</span></div>
+        <div class="stat"><span class="v">{{ res.evidencia.objeciones_resueltas }}<small>/{{ res.evidencia.objeciones_lanzadas }}</small></span><span class="l">objeciones resueltas</span></div>
+        <div class="stat"><span class="v">{{ res.evidencia.turno_primer_descuento or '—' }}</span><span class="l">turno del primer descuento</span><span class="d muted">silencio activo: {{ 'sí' if res.evidencia.uso_silencio_activo else 'no' }}</span></div>
+      </div>
+      <div class="mt"><span class="muted small">Etapas PRAINCODERECI cumplidas:</span> {% for e in res.evidencia.etapas_cumplidas %}<span class="chip">{{ e }}</span> {% else %}—{% endfor %}</div>
+    </div>
+    {% endif %}
+
+    {% if mostrar_transcripcion %}
+    <div class="card"><details><summary>Transcripción completa ({{ mensajes|length }} mensajes)</summary>
+      <div class="msgs mt" style="max-height:420px">{% for msg in mensajes %}{% if msg.rol in ('usuario','avatar') %}<div class="msg {{ msg.rol }}"><span class="who">{{ 'Tú' if msg.rol == 'usuario' and propia else (s.usuario_nombre if msg.rol == 'usuario' else avatar.nombre) }}</span>{{ msg.texto }}</div>{% endif %}{% endfor %}</div></details></div>
+    {% endif %}
+  </div>
+
+  <div class="stack">
+    <div class="card dark">
+      <div class="cap" style="color:rgba(255,255,255,.6)">Siguiente paso</div>
+      <h2 style="color:#fff">{{ reco.objetivo_siguiente or reco.competencia or '—' }}</h2>
+      <p class="muted">{{ reco.razon or reco.por_que }}</p>
+      {% if reco.nivel_sugerido %}<span class="chip" style="background:rgba(255,255,255,.15);color:#fff">nivel sugerido: {{ reco.nivel_sugerido }}</span>{% endif %}
+      {% if propia and siguiente %}<a class="btn mt block" style="background:#fff" href="/entrenar/{{ siguiente.habilidad }}?item={{ siguiente.id }}">Preparar mi siguiente sesión →</a>{% endif %}
+    </div>
+    {% if analisis %}
+    <div class="card"><h2>Lectura del Analista</h2><span class="chip {{ {'bajo':'mint','medio':'amber','alto':'rose'}[analisis.contenido.riesgo] }}">riesgo {{ analisis.contenido.riesgo }}</span>
+      <p class="small mt">{{ analisis.contenido.lectura }}</p><p class="small"><b>Para el líder:</b> {{ analisis.contenido.recomendacion_lider }}</p>
+      {% if analisis.contenido.decisiones %}<ul class="list">{% for d in analisis.contenido.decisiones %}<li class="small">{{ d }}</li>{% endfor %}</ul>{% endif %}</div>
+    {% endif %}
+    {% if propia and chat is not none %}
+    <div class="card">
+      <h2>Pregúntale a {{ avatar.nombre.split(' ')[0] }}</h2><p class="muted small">Sobre tu retroalimentación: qué significa un score, cómo practicar una técnica, cómo preparar la siguiente sesión.</p>
+      <div data-chat="/api/reporte/{{ s.id }}/chat" data-quien="{{ avatar.nombre }}">
+        <div class="msgs" style="max-height:320px;min-height:120px">{% for msg in chat.mensajes %}<div class="msg {{ 'usuario' if msg.rol == 'usuario' else 'avatar' }}"><span class="who">{{ 'Tú' if msg.rol == 'usuario' else avatar.nombre }}</span>{{ msg.texto }}</div>{% endfor %}</div>
+        <div class="composer"><textarea placeholder="¿Cómo puedo mejorar mi KPI-2?"></textarea><button class="btn primary enviar" type="button">Enviar</button></div>
+      </div>
+    </div>
+    {% endif %}
+    <div class="card"><div class="cap">Detalle</div><div class="small">Objetivo: {{ s.objetivo or '—' }}</div><div class="small muted">Tensión máxima {{ s.tension_max }} · costo de IA {{ (s.costo_usd * 20)|round(2) }} MXN aprox.</div></div>
+  </div>
+</div>
+{% endblock %}

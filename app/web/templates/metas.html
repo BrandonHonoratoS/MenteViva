@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% block title %}Metas{% endblock %}
+{% block subtitulo %}El Analista integra estas metas al recalcular roadmaps y al escribir sus lecturas{% endblock %}
+{% block content %}
+{% if ok %}<div class="alert ok mb">Meta creada.</div>{% endif %}
+<div class="grid g-1-2">
+  <div class="card"><h2>Nueva meta</h2>
+    <form method="post" action="/metas"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="field"><label>Habilidad</label><select name="habilidad" id="meta-hab">{% for h in habilidades %}<option value="{{ h.id }}">{{ h.nombre }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Competencia (sólo Ruta DM, opcional)</label><input name="competencia" list="comps" placeholder="Ej. Gestión de conflictos"><datalist id="comps">{% for c in competencias_dm %}<option value="{{ c }}">{% endfor %}</datalist></div>
+      <div class="grid g2"><div class="field"><label>Score mínimo</label><input name="score_minimo" type="number" min="0" max="100" value="75"></div><div class="field"><label>Plazo</label><input name="plazo" type="date"></div>
+      <div class="field"><label>Prioridad</label><select name="prioridad"><option value="alta">alta</option><option value="media" selected>media</option><option value="baja">baja</option></select></div>
+      {% if u.rol == 'rrhh' %}<div class="field"><label>Área</label><select name="area_id"><option value="0">toda la empresa</option>{% for a in areas %}<option value="{{ a.id }}">{{ a.nombre }}</option>{% endfor %}</select></div>{% endif %}
+      <div class="field"><label>Colaborador (opcional)</label><select name="usuario_id"><option value="0">todos</option>{% for c in colaboradores %}<option value="{{ c.id }}">{{ c.nombre }}</option>{% endfor %}</select></div></div>
+      <div class="field"><label>Descripción</label><input name="descripcion" placeholder="Ej. preparar al equipo comercial para el cierre de año"></div>
+      <button class="btn primary" type="submit">Crear meta</button></form></div>
+  <div class="card"><h2>Metas</h2>
+    <table><thead><tr><th>Habilidad</th><th>Alcance</th><th class="tright">Mínimo</th><th>Plazo</th><th>Prioridad</th><th>Creó</th><th></th></tr></thead><tbody>
+    {% for mt in metas %}<tr><td><b>{{ mt.habilidad|hab_corto }}</b>{% if mt.competencia %}<div class="muted tiny">{{ mt.competencia }}</div>{% endif %}{% if mt.descripcion %}<div class="muted tiny">{{ mt.descripcion }}</div>{% endif %}</td><td>{{ mt.usuario_nombre or mt.area_nombre or 'empresa' }}</td><td class="tright">{{ mt.score_minimo|round(0)|int }}</td><td>{{ mt.plazo or '—' }}</td><td><span class="chip {{ {'alta':'rose','media':'amber','baja':'mint'}[mt.prioridad] }}">{{ mt.prioridad }}</span></td><td class="muted small">{{ mt.creador_nombre }}</td>
+      <td>{% if mt.estado == 'activa' %}<form method="post" action="/metas/{{ mt.id }}/cerrar"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn sm" type="submit">Cerrar</button></form>{% else %}<span class="chip gris">{{ mt.estado }}</span>{% endif %}</td></tr>{% else %}<tr><td colspan="7" class="empty">Sin metas.</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+{% endblock %}

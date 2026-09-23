@@ -1,0 +1,42 @@
+{% extends "base.html" %}{% block title %}Mi diagnóstico{% endblock %}
+{% block subtitulo %}Elena Ríos · entrevista por competencias{% endblock %}
+{% block content %}
+{% if error %}<div class="alert err mb">{{ error }}</div>{% endif %}
+{% if perfil.estado in ('pendiente',) or not perfil.onboarding %}
+<div class="grid g-1-2">
+  <div class="card hero">
+    <div class="orb-wrap"><div class="orb" style="--c1:#3B82F6;--c2:#06B6D4"></div><b>Elena Ríos</b><span class="muted small">Entrevistadora por competencias</span></div>
+    <p class="muted mt">Antes de conversar, responde con un toque estas preguntas. Con ellas Elena calibra la entrevista y Celeste y Juan personalizan cada práctica. Puedes cambiarlas después.</p>
+    <p class="soft tiny">No se usan tokens de IA en este paso.</p>
+  </div>
+  <div class="card" id="onboarding" data-vars='{{ variables|tojson_safe }}' data-grupo-ventas='{{ grupo_ventas|tojson_safe }}' data-previo='{{ (perfil.onboarding or {})|tojson_safe }}'>
+    <div class="row between"><span class="chip" id="ob-grupo">—</span><span class="muted small" id="ob-n"></span></div>
+    <div class="bar mt"><i id="ob-prog" style="width:0"></i></div>
+    <h2 class="mt-l" id="ob-q" style="font-size:1.35rem"></h2>
+    <div class="chips mt" id="ob-chips"></div>
+    <div class="field mt" id="ob-prod" style="display:none"><label>¿Qué producto o servicio concreto? (opcional, ayuda a Celeste)</label><input placeholder="Ej. implementación de Odoo para PYMES"></div>
+    <div class="row mt-l"><button class="btn" id="ob-prev" type="button">← Anterior</button><button class="btn" id="ob-next" type="button">Siguiente →</button><span class="grow"></span><button class="btn primary" id="ob-done" type="button" style="display:none">Guardar y conocer a Elena</button></div>
+  </div>
+</div>
+{% else %}
+<div class="grid g-1-2">
+  <div class="card hero">
+    <div class="orb-wrap"><div class="orb" style="--c1:#3B82F6;--c2:#06B6D4"></div><b>Elena Ríos</b><span class="muted small">Entrevistadora por competencias</span></div>
+    <p class="muted mt">Perfil guardado. Ahora viene la entrevista: unos 25 minutos de conversación por escrito. Elena no evalúa en voz alta; busca historias reales y repregunta. Al final te dará retroalimentación, tu nivel en cada habilidad y tus planes.</p>
+    <ul class="list mt">
+      <li><span class="n">1</span><div>Responde con ejemplos concretos, no con generalidades.</div></li>
+      <li><span class="n">2</span><div>Si necesitas cortar, escribe <b>Fin</b> y Elena cerrará con lo que haya.</div></li>
+      <li><span class="n">3</span><div>Es un espejo, no un examen: no hay respuestas correctas.</div></li>
+    </ul>
+    <form method="post" action="/diagnostico/iniciar" class="mt-l"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn primary lg" type="submit">Comenzar la entrevista</button></form>
+    <form method="post" action="/diagnostico/repetir" class="mt"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn ghost sm" type="submit">Cambiar mis respuestas del cuestionario</button></form>
+  </div>
+  <div class="card">
+    <h2>Tu perfil declarado</h2>
+    <div class="grid g2">
+    {% for v in variables %}{% if perfil.onboarding.get(v.id) %}<div><div class="muted tiny">{{ v.pregunta }}</div><b>{{ perfil.onboarding[v.id] if perfil.onboarding[v.id] is string else perfil.onboarding[v.id]|join(', ') }}</b></div>{% endif %}{% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

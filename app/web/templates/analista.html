@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% block title %}El Analista{% endblock %}
+{% block subtitulo %}Pregunta con datos: consulta fichas, indicadores, sesiones, metas; investiga con fuentes; propone acciones para tu aprobación{% endblock %}
+{% block acciones %}<button class="btn sm" id="limpiar-chat" type="button">Nueva conversación</button>{% endblock %}
+{% block content %}
+<div class="chat">
+  <aside class="side">
+    <div class="card hero"><div class="orb-wrap"><div class="orb" style="--c1:#F59E0B;--c2:#A855F7"></div><b>El Analista</b><span class="muted small">Alcance: {{ 'tu área' if u.rol == 'director' else 'toda la empresa' }}</span></div>
+      <p class="small muted mt">Nunca inventa cifras: cada respuesta sale de las herramientas sobre la base de datos. Las investigaciones citan sus fuentes y prefieren páginas oficiales o académicas. No reproduce transcripciones.</p></div>
+    <div class="card"><div class="cap">Prueba con</div><div class="stack">{% for s in sugerencias %}<button class="btn sm" type="button" data-sugerencia="{{ s }}" style="text-align:left;justify-content:flex-start">{{ s }}</button>{% endfor %}</div></div>
+    {% if presupuesto_full.grounded_mes is defined %}<div class="card"><div class="cap">Investigaciones con búsqueda</div><b>{{ presupuesto_full.grounded_mes }} / {{ presupuesto_full.grounding_max }}</b> este mes<div class="muted tiny">Tienen costo adicional; el tope lo fija Mente Viva.</div></div>{% endif %}
+  </aside>
+  <section class="card panel" data-chat="/api/analista/chat" data-quien="Analista">
+    <div class="msgs">{% for msg in chat.mensajes %}<div class="msg {{ 'usuario' if msg.rol == 'usuario' else 'avatar' }}"><span class="who">{{ 'Tú' if msg.rol == 'usuario' else 'Analista' }}</span>{{ msg.texto }}{% if msg.meta.fuentes %}<span class="src">Fuentes: {% for f in msg.meta.fuentes %}<a href="{{ f.url }}" target="_blank" rel="noopener">{{ f.dominio or f.titulo }}</a>{% endfor %}</span>{% endif %}{% if msg.meta.herramientas %}<span class="src soft">Consultó: {{ msg.meta.herramientas|join(', ') }}</span>{% endif %}</div>{% else %}<div class="msg sistema">Hola, soy el Analista. Pregúntame por una persona, un área o la organización.</div>{% endfor %}</div>
+    <div class="composer"><textarea placeholder="¿Quién necesita atención esta semana?"></textarea><button class="btn primary enviar" type="button">Enviar</button></div>
+  </section>
+</div>
+{% endblock %}

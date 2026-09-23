@@ -1,0 +1,37 @@
+{% extends "base.html" %}{% block title %}Mi diagnóstico{% endblock %}
+{% block subtitulo %}Elena Ríos · {{ diag.fecha|fecha }}{% endblock %}
+{% block content %}
+<div class="grid g-2-1">
+  <div class="stack">
+    <div class="card hero">
+      <div class="row" style="gap:26px">
+        <div class="orb-wrap"><div class="orb" style="--c1:#3B82F6;--c2:#06B6D4"></div><b>Elena Ríos</b></div>
+        <div style="flex:1;min-width:240px"><div class="cap">Resumen ejecutivo</div><p>{{ diag.resumen_ejecutivo }}</p>
+          <p class="small muted"><i>{{ diag.mensaje_para_la_persona }}</i></p>
+          <div class="row mt"><span class="chip">Estilo: {{ diag.estilo_comunicacion }}</span><span class="chip aqua">Score inicial {{ diag.score_inicial|num }}</span></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Competencias observadas</h2>
+      <div class="grid g-1-2">
+        <div style="height:300px"><canvas data-radar='{{ {"labels": diag.competencias|map(attribute="nombre")|list, "values": diag.competencias|map(attribute="nivel")|list, "max": 5}|tojson_safe }}'></canvas></div>
+        <div>{% for c in diag.competencias %}<div class="kpi-row" style="grid-template-columns:170px 1fr 40px"><b class="small">{{ c.nombre }}</b><span class="tiny muted">{{ c.justificacion }}</span><span class="chip {{ 'gris' if c.nivel == 0 else ('mint' if c.nivel >= 4 else ('amber' if c.nivel == 3 else 'rose')) }}">{{ c.nivel or '—' }}/5</span></div>{% endfor %}</div>
+      </div>
+    </div>
+    <div class="grid g2">
+      <div class="card"><h2>Fortalezas</h2>{% for f in diag.fortalezas %}<div class="mb"><b>{{ f.habilidad }}</b><div class="small">“{{ f.evidencia }}”</div><div class="muted small">{{ f.por_que_importa }}</div></div>{% endfor %}</div>
+      <div class="card"><h2>Áreas de oportunidad</h2>{% for o in diag.oportunidades %}<div class="mb"><b>{{ o.habilidad }}</b><div class="small">{{ o.evidencia }}</div><div class="muted small">{{ o.impacto }}</div><div class="chip aqua" style="margin-top:6px">Micro-práctica: {{ o.micro_practica }}</div></div>{% endfor %}
+        <div class="alert warn mt"><b>Blind spot:</b> {{ diag.blind_spot }}</div><p class="mt"><i>{{ diag.pregunta_para_llevarse }}</i></p></div>
+    </div>
+  </div>
+  <div class="stack">
+    <div class="card dark"><div class="cap" style="color:rgba(255,255,255,.6)">Tus niveles de partida</div>
+      {% for h, n in niveles.items() %}<div class="row between mb"><span>{{ h|hab }}</span><span class="badge-level">{{ n.nivel }}</span></div>{% endfor %}
+      <p class="small muted">Ventas: {{ diag.nivel_ventas_justificacion }}</p><p class="small muted">Ruta DM: {{ diag.nivel_dm_justificacion }}</p></div>
+    <div class="card"><h2>Prioridades de Elena</h2>{% for p in diag.prioridades %}<div class="mb"><div class="row between"><b>{{ p.habilidad_id|hab }}</b><span class="chip {{ {'alta':'rose','media':'amber','baja':'mint'}[p.brecha] }}">brecha {{ p.brecha }}</span></div><div class="small muted">{{ p.razon }}</div></div>{% endfor %}
+      <a class="btn primary block mt" href="/roadmaps">Ver mis planes ({{ roadmaps|length }})</a></div>
+    <div class="card"><h2>¿Repetir el diagnóstico?</h2><p class="muted small">Si tu rol cambió, puedes volver a entrevistarte con Elena. Tus planes actuales se pausan y se rediseñan.</p>
+      <form method="post" action="/diagnostico/repetir" data-confirm="¿Repetir el diagnóstico? Se pausarán tus planes actuales."><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn sm" type="submit">Repetir con Elena</button></form></div>
+  </div>
+</div>
+{% endblock %}

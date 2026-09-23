@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% block title %}Análisis{% endblock %}
+{% block subtitulo %}Todo lo que el Analista escribe queda guardado: lecturas por sesión, resúmenes semanales e investigaciones con fuentes{% endblock %}
+{% block content %}
+<div class="tabs">{% for t, n in [('','Todo'),('post_sesion','Por sesión'),('area','Área'),('organizacion','Organización'),('investigacion','Investigaciones')] %}<a href="/analisis?tipo={{ t }}" class="{{ 'on' if tipo == t }}">{{ n }}</a>{% endfor %}</div>
+{% for a in lista %}
+<div class="card mb" style="margin-bottom:14px">
+  <div class="row between"><div><span class="chip">{{ a.tipo|replace('_',' ') }}</span> <b>{{ a.titulo }}</b><div class="soft tiny">{{ a.creado_en|fecha }}{% if a.usuario_nombre %} · <a href="/colaborador/{{ a.usuario_id }}">{{ a.usuario_nombre }}</a>{% endif %}{% if a.area_nombre %} · {{ a.area_nombre }}{% endif %}</div></div>
+    {% if a.contenido.riesgo %}<span class="chip {{ {'bajo':'mint','medio':'amber','alto':'rose'}[a.contenido.riesgo] }}">riesgo {{ a.contenido.riesgo }}</span>{% endif %}</div>
+  {% set c = a.contenido %}
+  {% if a.tipo == 'post_sesion' %}<p class="small mt">{{ c.lectura }}</p><p class="small"><b>Para el líder:</b> {{ c.recomendacion_lider }}</p><p class="small"><b>Siguiente objetivo:</b> {{ c.siguiente_objetivo }} · <b>Ajuste:</b> {{ c.ajuste_plan }} ({{ c.ajuste_motivo }})</p>{% if c.senales %}<div class="row">{% for s in c.senales %}<span class="chip gris">{{ s }}</span>{% endfor %}</div>{% endif %}{% if c.decisiones %}<ul class="list mt">{% for d in c.decisiones %}<li class="small">{{ d }}</li>{% endfor %}</ul>{% endif %}
+  {% elif a.tipo in ('area','organizacion') %}<p class="small mt">{{ c.resumen }}</p>{% if c.avanzan %}<div class="small"><b>Avanzan:</b> {{ c.avanzan|join(' · ') }}</div>{% endif %}{% if c.atencion %}<div class="small"><b>Atención:</b> {{ c.atencion|join(' · ') }}</div>{% endif %}<ul class="list mt">{% for r in c.recomendaciones %}<li><span class="chip {{ {'alta':'rose','media':'amber','baja':'mint'}[r.prioridad] }}">{{ r.prioridad }}</span><div class="small"><b>{{ r.accion }}</b><div class="muted tiny">{{ r.responsable }} · éxito: {{ r.senal_exito }}</div></div></li>{% endfor %}</ul>
+  {% elif a.tipo == 'investigacion' %}<p class="small mt" style="white-space:pre-wrap">{{ c.texto }}</p><div class="src-list">{% for f in a.fuentes %}<a href="{{ f.url }}" target="_blank" rel="noopener">{{ f.titulo }}<small>{{ f.dominio }}</small></a>{% else %}<span class="muted tiny">Sin fuentes verificadas.</span>{% endfor %}</div>
+  {% endif %}
+</div>
+{% else %}<div class="empty">El Analista aún no ha escrito nada aquí.</div>{% endfor %}
+{% endblock %}
