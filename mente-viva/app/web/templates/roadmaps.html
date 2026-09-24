@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% block title %}Mis planes{% endblock %}
+{% block subtitulo %}Roadmaps diseñados por Elena y recalculados por el Analista después de cada sesión{% endblock %}
+{% block content %}
+{% if perfil.estado != 'completo' %}<div class="card hero"><h2>Primero tu diagnóstico</h2><p class="muted">Elena diseña tus planes al terminar la entrevista.</p><a class="btn primary mt" href="/diagnostico">Ir al diagnóstico</a></div>
+{% elif not roadmaps %}<div class="card hero"><h2>Aún no hay planes</h2><p class="muted">Si Elena ya te diagnosticó, genera tus planes aquí (la IA pudo estar saturada al cerrar la entrevista).</p>
+<form method="post" action="/diagnostico/planes"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn primary mt" type="submit">Generar mis planes ahora</button></form></div>{% endif %}
+{% for r in roadmaps %}
+{% set hab = HABILIDADES[r.habilidad] %}{% set av = AVATARES[hab.agente] %}
+<div class="card mb" style="margin-bottom:18px">
+  <div class="row between">
+    <div class="row"><div class="orb sm" style="--c1:{{ av.color }};--c2:#06B6D4"></div><div><h2 style="margin:0">{{ hab.nombre }} <span class="chip {{ {'activo':'mint','propuesto':'amber','pausado':'gris','completado':'aqua','rechazado':'rose'}[r.estado] }}">{{ r.estado }}</span></h2><div class="muted small">con {{ av.nombre }} · desde nivel {{ r.nivel_inicio }} · {{ r.horizonte_semanas }} semanas · {{ r.sesiones_semana }}/semana · versión {{ r.version }}{% if r.ajustes %} · {{ r.ajustes }} ajustes del Analista{% endif %}</div></div></div>
+    <div class="stat" style="align-items:flex-end"><span class="v">{{ r.completadas }}<small>/{{ r.total }}</small></span><span class="l">sesiones</span></div>
+  </div>
+  <div class="bar mt"><i style="width:{{ (r.completadas / r.total * 100) if r.total else 0 }}%"></i></div>
+  {% if r.estado == 'propuesto' %}<div class="alert warn mt">Elena propone este plan aunque la habilidad no forma parte de tu rol declarado; RRHH decide si se activa.</div>{% endif %}
+  <div class="grid g-1-2 mt">
+    <div><div class="cap">Objetivo del plan</div><p>{{ r.objetivo }}</p><div class="cap mt">Por qué este orden</div><p class="small muted">{{ r.razon }}</p></div>
+    <div class="timeline">
+      {% set ns = namespace(next=false) %}
+      {% for it in r['items'] %}
+      {% set es_next = (not ns.next and it.estado == 'pendiente' and r.estado == 'activo') %}{% if es_next %}{% set ns.next = true %}{% endif %}
+      <div class="tl-item {{ 'done' if it.estado == 'completada' else '' }} {{ 'refuerzo' if it.tipo == 'refuerzo' else '' }} {{ 'next' if es_next else '' }}">
+        <div class="row between"><span class="chip {{ 'amber' if it.tipo == 'refuerzo' else '' }}">Semana {{ it.semana }} · {{ it.nivel }}{% if it.competencia %} · {{ it.competencia }}{% endif %}{% if it.tipo == 'refuerzo' %} · 🔁 refuerzo agregado por la IA{% endif %}</span>{% if it.estado == 'completada' and it.sesion_id %}<a class="btn sm" href="/sesion/{{ it.sesion_id }}/reporte">Ver reporte</a>{% elif es_next and not en_curso %}<a class="btn primary sm" href="/entrenar/{{ r.habilidad }}?item={{ it.id }}">Entrenar</a>{% endif %}</div>
+        <div class="mt" style="margin-top:6px"><b>{{ it.objetivo }}</b></div>{% if it.porque %}<div class="muted small">{{ it.porque }}</div>{% endif %}
+      </div>{% endfor %}
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endblock %}

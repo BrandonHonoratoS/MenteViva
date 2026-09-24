@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block title %}{{ 'Aviso' if codigo == 200 else 'Error ' ~ codigo }}{% endblock %}
+{% block content %}
+<div class="card hero center" style="max-width:640px;margin:40px auto">
+  <div class="orb sm" style="margin:0 auto 14px;--c1:#F43F5E;--c2:#A855F7"></div>
+  <h2>{{ 'Un momento' if codigo == 200 else ('No encontrado' if codigo == 404 else ('Sin acceso' if codigo == 403 else 'Algo salió mal')) }}</h2>
+  <p class="muted">{{ detalle }}</p>
+  <a class="btn primary mt" href="/">Ir al inicio</a>
+</div>
+{% endblock %}

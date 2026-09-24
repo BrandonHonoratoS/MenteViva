@@ -1,0 +1,42 @@
+{% extends "base.html" %}{% block title %}Plataforma{% endblock %}
+{% block subtitulo %}Equipo Mente Viva · empresas, modelo de IA y presupuesto{% endblock %}
+{% block content %}
+{% if ok %}<div class="alert ok mb">{{ ok }}{% if clave %} · Contraseña temporal: <b class="mono">{{ clave }}</b>{% endif %}</div>{% endif %}
+{% if error %}<div class="alert err mb">{{ error }}</div>{% endif %}
+<div class="grid g4 mb">
+  <div class="card stat"><span class="l">Presupuesto del mes</span><span class="v">{{ presupuesto_full.gastado_mxn }}<small> / {{ presupuesto_full.presupuesto_mxn|round(0)|int }} MXN</small></span><span class="d muted">{{ presupuesto_full.pct }} % · {{ presupuesto_full.uso.llamadas }} llamadas</span><div class="bar mt"><i style="width:{{ [presupuesto_full.pct, 100]|min }}%"></i></div></div>
+  <div class="card stat"><span class="l">Tokens del mes</span><span class="v">{{ ((presupuesto_full.uso.tok_in + presupuesto_full.uso.tok_out) / 1000)|round(0)|int }}<small>k</small></span><span class="d muted">entrada {{ (presupuesto_full.uso.tok_in/1000)|round(0)|int }}k · salida {{ (presupuesto_full.uso.tok_out/1000)|round(0)|int }}k · pensamiento {{ (presupuesto_full.uso.tok_think/1000)|round(0)|int }}k</span></div>
+  <div class="card stat"><span class="l">Proveedor</span><span class="v" style="font-size:1.2rem">{{ config.proveedor }}</span><span class="d muted">API key {{ 'configurada' if config.api_key else 'AUSENTE' }} · {{ config.modelo_principal }} / {{ config.modelo_ligero }}</span></div>
+  <div class="card stat"><span class="l">Búsquedas web</span><span class="v">{{ presupuesto_full.grounded_mes }}<small> / {{ presupuesto_full.grounding_max }}</small></span><span class="d muted">consultas con Google Search este mes</span></div>
+</div>
+<div class="grid g-1-2">
+  <div class="stack">
+    <div class="card"><h2>Modelo de IA y presupuesto</h2>
+      <form method="post" action="/admin/config"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="field"><label>Modelo principal (avatares, feedback, analista)</label><input name="modelo_principal" value="{{ config.modelo_principal }}"></div>
+        <div class="field"><label>Modelo ligero (resúmenes, lecturas breves)</label><input name="modelo_ligero" value="{{ config.modelo_ligero }}"></div>
+        <div class="grid g2"><div class="field"><label>Tope mensual (MXN)</label><input name="presupuesto_mxn" type="number" step="1" value="{{ config.presupuesto_mxn }}"></div><div class="field"><label>Tipo de cambio MXN/USD</label><input name="tipo_cambio" type="number" step="0.01" value="{{ config.tipo_cambio }}"></div></div>
+        <div class="field"><label>Máximo de búsquedas web al mes</label><input name="grounding_max_mes" type="number" value="{{ config.grounding_max_mes }}"></div>
+        <button class="btn primary" type="submit">Guardar</button></form>
+      <details class="mt"><summary>Tarifas registradas (USD por millón de tokens)</summary><table class="mt">{% for mdl, p in config.precios.items() %}<tr><td class="mono small">{{ mdl }}</td><td class="tright">{{ p[0] }} / {{ p[1] }}</td></tr>{% endfor %}</table><p class="muted tiny">Se sobreescriben con la variable PRICE_TABLE. Verifica en ai.google.dev/gemini-api/docs/pricing.</p></details></div>
+    <div class="card"><h2>Superadministradores</h2>{% for s in superadmins %}<div class="row between small"><span>{{ s.nombre }} <span class="muted">{{ s.email }}</span></span><span class="chip {{ 'mint' if s.activo else 'gris' }}">{{ 'activo' if s.activo else 'inactivo' }}</span></div>{% endfor %}
+      <form method="post" action="/admin/superadmins" class="inline-form mt"><input type="hidden" name="csrf" value="{{ csrf }}"><div class="field"><input name="nombre" placeholder="Nombre"></div><div class="field"><input name="email" type="email" placeholder="correo@menteviva.mx" required></div><button class="btn sm" type="submit">Agregar</button></form></div>
+  </div>
+  <div class="stack">
+    <div class="card"><h2>Nueva empresa</h2>
+      <form method="post" action="/admin/empresas"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="grid g2"><div class="field"><label>Nombre</label><input name="nombre" required></div><div class="field"><label>Industria</label><input name="industria"></div>
+        <div class="field"><label>Nombre de RRHH</label><input name="rrhh_nombre"></div><div class="field"><label>Correo de RRHH</label><input name="rrhh_email" type="email"></div></div>
+        <label class="row"><input type="checkbox" name="ruta_dm" value="1" style="width:auto"> Habilitar el escenario personalizado “Ruta Delivery Manager” (Ingeniería Cóndor)</label>
+        <button class="btn primary mt" type="submit">Crear empresa</button></form></div>
+    <div class="card"><h2>Empresas</h2>
+      {% for e in empresas %}
+      <div class="mb" style="padding:12px;border:1px solid var(--line);border-radius:14px">
+        <div class="row between"><div><b>{{ e.nombre }}</b> <span class="chip {{ 'mint' if e.activa else 'gris' }}">{{ 'activa' if e.activa else 'inactiva' }}</span><div class="muted tiny">{{ e.industria or '—' }} · {{ e.usuarios }} usuarios · creada {{ e.creado_en|fecha_corta }}</div></div>
+          <form method="post" action="/admin/empresas/{{ e.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="{{ 'desactivar' if e.activa else 'activar' }}"><button class="btn sm" type="submit">{{ 'Desactivar' if e.activa else 'Activar' }}</button></form></div>
+        <form method="post" action="/admin/empresas/{{ e.id }}" class="row mt"><input type="hidden" name="csrf" value="{{ csrf }}">{% for h in personalizadas %}<label class="row small" style="margin:0"><input type="checkbox" name="habilidades" value="{{ h.id }}" style="width:auto" {{ 'checked' if h.id in e.habilidades }}> {{ h.nombre }}</label>{% endfor %}<button class="btn sm" type="submit">Guardar habilidades</button></form>
+        <form method="post" action="/admin/empresas/{{ e.id }}/rrhh" class="inline-form mt"><input type="hidden" name="csrf" value="{{ csrf }}"><div class="field"><input name="nombre" placeholder="Nombre RRHH"></div><div class="field"><input name="email" type="email" placeholder="correo RRHH" required></div><button class="btn sm" type="submit">Crear usuario RRHH</button></form>
+      </div>{% else %}<div class="empty">Sin empresas.</div>{% endfor %}</div>
+  </div>
+</div>
+{% endblock %}

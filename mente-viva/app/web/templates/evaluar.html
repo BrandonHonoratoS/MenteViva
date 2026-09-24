@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% block title %}Evaluar a {{ x.nombre }}{% endblock %}
+{% block subtitulo %}Evaluación del líder · periodo {{ periodo }} · 2 minutos{% endblock %}
+{% block content %}
+<div class="grid g-1-2">
+  <div class="card"><h2>Para qué sirve</h2><p class="muted">Tu mirada es la que convierte la práctica en un índice de <b>aplicación</b> y <b>transferencia</b>: la IA mide la sesión; tú confirmas si se nota en el trabajo real. Responde sobre lo observado este mes, no sobre la persona.</p>
+    {% if previas %}<div class="cap mt">Anteriores</div>{% for e in previas %}<div class="row between small"><span>{{ e.periodo }}</span><b>{{ e.promedio }}/5</b></div>{% endfor %}{% endif %}
+    <a class="btn ghost sm mt" href="/colaborador/{{ x.id }}">← Ficha</a></div>
+  <div class="card">
+    {% if ok %}<div class="alert ok mb">Evaluación guardada.</div>{% endif %}
+    {% if actual %}<div class="alert info mb">Ya evaluaste este periodo ({{ actual.promedio }}/5). Guardar de nuevo la reemplaza.</div>{% endif %}
+    <form method="post" action="/evaluar/{{ x.id }}"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="cap">1 = nada de acuerdo · 5 = totalmente de acuerdo</div>
+      {% for p in preguntas %}<div class="field mt"><label>{{ p.texto }}</label><div class="num-scale">{% for n in range(1,6) %}<label><input type="radio" name="{{ p.id }}" value="{{ n }}" required {{ 'checked' if actual and actual.respuestas.get(p.id) == n }}><span>{{ n }}</span></label>{% endfor %}</div></div>{% endfor %}
+      <div class="field"><label>Evidencia observada (opcional)</label><textarea name="comentario" placeholder="Ej. en la reunión con el cliente X hizo preguntas antes de proponer…">{{ actual.comentario if actual }}</textarea></div>
+      <button class="btn primary" type="submit">Guardar evaluación</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

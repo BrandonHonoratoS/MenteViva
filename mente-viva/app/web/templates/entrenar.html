@@ -1,0 +1,42 @@
+{% extends "base.html" %}{% block title %}{{ hab.nombre }}{% endblock %}
+{% block subtitulo %}Briefing antes de entrar con {{ avatar.nombre }}{% endblock %}
+{% block content %}
+<div class="grid g-1-2">
+  <div class="card hero">
+    <div class="orb-wrap"><div class="orb" style="--c1:{{ avatar.color }};--c2:#06B6D4"></div><b>{{ avatar.nombre }}</b><span class="muted small">{{ avatar.rol }}</span></div>
+    <p class="muted mt">{{ avatar.descripcion }}</p>
+    <div class="row mt"><span class="chip">~{{ duracion }} min</span><span class="chip aqua">nivel {{ nivel }}</span>{% if item %}<span class="chip mint">del plan · semana {{ item.semana }}</span>{% else %}<span class="chip amber">práctica voluntaria</span>{% endif %}</div>
+    {% if hab.id == 'ventas' %}
+    <div class="cap mt-l">Cómo te evalúa Celeste</div>
+    {% for k in kpis %}<div class="row between small"><span>{{ k.id }} {{ k.nombre }}</span><b>{{ pesos.get(k.id, 0) }} %</b></div>{% endfor %}
+    <p class="small muted mt">Objeciones en orden, una a la vez. Descuento prematuro sube la presión. Escucha genuina (SPIN Implicación/Necesidad) la abre 20 %.</p>
+    {% elif hab.id == 'entrevistas' %}
+    <div class="cap mt-l">Cómo te evalúa Elena</div>
+    {% for k in kpis %}<div class="row between small"><span>{{ k.id }} {{ k.nombre }}</span><b>{{ pesos.get(k.id, 0) }} %</b></div>{% endfor %}
+    {% else %}
+    <div class="cap mt-l">Tu ruta</div>
+    <div class="dm-track">{% for n in RUTA_DM %}<span class="{{ 'on' if n.nivel == nivel else ('done' if RUTA_DM.index(n) < (RUTA_DM|map(attribute='nivel')|list).index(nivel) else '') }}">{{ n.nivel }}</span>{% endfor %}</div>
+    <p class="small muted mt">Estás en <b>{{ nivel }}</b>. Entrenas las competencias de <b>{{ sig_dm }}</b> → “{{ valor_dm }}”. Juan elige el formato (roleplay, caso o reto) que mejor revele tu conducta real. Al final: 9 secciones de retroalimentación profunda.</p>
+    {% endif %}
+  </div>
+  <div class="card">
+    <form method="post" action="/entrenar/{{ hab.id }}/iniciar">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      {% if item %}
+      <input type="hidden" name="item" value="{{ item.id }}"><input type="hidden" name="nivel" value="{{ item.nivel }}"><input type="hidden" name="competencia" value="{{ item.competencia }}">
+      <div class="cap">Objetivo de esta sesión</div><h2 style="font-size:1.4rem">{{ item.objetivo }}</h2>{% if item.porque %}<p class="muted">{{ item.porque }}</p>{% endif %}
+      {% if item.competencia %}<p><span class="chip">{{ item.competencia }}</span> <span class="chip aqua">{{ NOMBRE_FORMATO.get(item.formato, 'formato a elegir por Juan') }}</span></p>{% endif %}
+      {% else %}
+      <div class="cap">Práctica voluntaria</div>
+      <div class="field"><label>Nivel</label><select name="nivel">{% for n in hab.niveles %}<option value="{{ n }}" {{ 'selected' if n == nivel }}>{{ n }}</option>{% endfor %}</select></div>
+      {% if competencias %}<div class="field"><label>Competencia del siguiente nivel ({{ sig_dm }})</label><select name="competencia">{% for c in competencias %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</select></div>{% endif %}
+      <div class="field"><label>Objetivo que quieres trabajar (opcional)</label><input name="objetivo" placeholder="Ej. manejar la objeción de precio sin ceder"></div>
+      {% endif %}
+      {% if hab.id == 'ventas' %}<div class="field"><label>¿Qué vas a vender hoy? (opcional)</label><input name="producto" value="{{ perfil.onboarding.get('producto_concreto','') }}" placeholder="Ej. implementación de Odoo para una PYME de manufactura"></div>{% endif %}
+      <div class="alert info mb">Durante la sesión el avatar no da retroalimentación: vive el escenario. Al terminar (o al escribir <b>Fin</b>) recibirás el análisis completo con evidencia.</div>
+      <button class="btn primary lg block" type="submit">Entrar con {{ avatar.nombre.split(' ')[0] }}</button>
+      {% if item %}<p class="center mt"><a class="small" href="/entrenar/{{ hab.id }}?item=0">Prefiero una práctica libre</a></p>{% endif %}
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% block title %}Mi cuenta{% endblock %}
+{% block subtitulo %}{{ u.email }} · {{ NOMBRES_ROL[u.rol] }}{% endblock %}
+{% block content %}
+<div class="grid g2">
+  <div class="card">
+    <h2>{{ 'Crea tu contraseña' if primer_acceso else 'Cambiar contraseña' }}</h2>
+    {% if primer_acceso %}<div class="alert info mb">Es tu primer acceso: elige una contraseña personal de al menos 10 caracteres para continuar.</div>{% endif %}
+    {% if ok %}<div class="alert ok mb">Contraseña actualizada.</div>{% endif %}
+    {% if error %}<div class="alert err mb">{{ error }}</div>{% endif %}
+    <form method="post" action="/cuenta/password">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="field"><label>Contraseña actual (o temporal)</label><input type="password" name="actual" required autocomplete="current-password"></div>
+      <div class="field"><label>Nueva contraseña</label><input type="password" name="nueva" required minlength="10" autocomplete="new-password"></div>
+      <div class="field"><label>Confirmar</label><input type="password" name="confirmar" required minlength="10" autocomplete="new-password"></div>
+      <button class="btn primary" type="submit">Guardar</button>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Privacidad y datos</h2>
+    <p class="muted">Tus conversaciones con los avatares son privadas: sólo tú y Recursos Humanos de tu empresa pueden leerlas. Tu director de área y Dirección General ven scores, retroalimentación y planes, nunca el diálogo.</p>
+    <p class="muted">La IA analiza únicamente lo que dices en las sesiones para darte retroalimentación con evidencia. No emite veredictos de empleabilidad ni etiquetas de personalidad.</p>
+  </div>
+</div>
+{% endblock %}

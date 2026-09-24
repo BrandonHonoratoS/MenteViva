@@ -1,0 +1,83 @@
+{% extends "base.html" %}{% block title %}Hoy{% endblock %}
+{% block subtitulo %}Hola, {{ u.nombre.split(' ')[0] }}. {% if resumen.racha %}Llevas {{ resumen.racha }} semana{{ 's' if resumen.racha != 1 }} seguida{{ 's' if resumen.racha != 1 }} practicando.{% else %}Una práctica de 15 minutos cambia la semana.{% endif %}{% endblock %}
+{% block content %}
+{% if perfil.estado != 'completo' %}
+<div class="card hero">
+  <div class="row" style="gap:26px">
+    <div class="orb" style="--c1:#3B82F6;--c2:#06B6D4"></div>
+    <div style="flex:1;min-width:260px">
+      <span class="chip aqua">Paso 1 · Diagnóstico</span>
+      <h2 style="font-size:1.5rem;margin-top:8px">Elena Ríos te está esperando</h2>
+      <p class="muted">Primero un cuestionario rápido (2 minutos, con botones) y luego una entrevista conversacional de unos 25 minutos. Al terminar tendrás tu perfil de competencias, tu nivel en cada habilidad y tus planes de desarrollo.</p>
+      <a class="btn primary lg mt" href="{{ '/sesion/' ~ en_curso.id if en_curso else '/diagnostico' }}">{{ 'Continuar mi diagnóstico' if en_curso or perfil.estado in ('entrevista','analizando') else 'Empezar mi diagnóstico' }}</a>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="grid g-2-1">
+  <div class="stack">
+    {% if en_curso %}
+    <div class="card hero"><div class="row between"><div><span class="chip amber">Sesión en curso</span><h2 style="margin-top:8px">Tienes una práctica abierta</h2><p class="muted">{{ en_curso.habilidad|hab }} · {{ en_curso.nivel }}</p></div><a class="btn primary" href="/sesion/{{ en_curso.id }}">Continuar</a></div></div>
+    {% elif siguiente %}
+    <div class="card hero">
+      <div class="row" style="gap:22px">
+        {% set hab = HABILIDADES[siguiente.habilidad] %}{% set av = AVATARES[hab.agente] %}
+        <div class="orb" style="--c1:{{ av.color }};--c2:#06B6D4"></div>
+        <div style="flex:1;min-width:240px">
+          <span class="chip">Tu siguiente sesión · semana {{ siguiente.semana }}{% if siguiente.tipo == 'refuerzo' %} · refuerzo{% endif %}</span>
+          <h2 style="font-size:1.4rem;margin-top:8px">{{ siguiente.objetivo }}</h2>
+          <p class="muted">{{ hab.nombre }} con {{ av.nombre }} · nivel {{ siguiente.nivel }}{% if siguiente.competencia %} · {{ siguiente.competencia }}{% endif %}{% if siguiente.porque %}<br><i>{{ siguiente.porque }}</i>{% endif %}</p>
+          <div class="row mt"><a class="btn primary lg" href="/entrenar/{{ siguiente.habilidad }}?item={{ siguiente.id }}">Entrenar ahora</a><a class="btn" href="/roadmaps">Ver mi plan</a></div>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="card hero"><h2>No tienes sesiones pendientes</h2><p class="muted">{% if roadmaps|selectattr('estado','equalto','propuesto')|list %}Tienes planes pendientes de aprobación por RRHH. Mientras tanto puedes entrenar libremente.{% else %}Elige una habilidad del catálogo para una práctica voluntaria.{% endif %}</p><a class="btn primary mt" href="/catalogo">Ir al catálogo</a></div>
+    {% endif %}
+
+    <div class="card">
+      <div class="row between"><h2>Tu evolución</h2><span class="muted small">score de cada sesión</span></div>
+      {% if serie %}<div style="height:220px"><canvas data-line='{{ {"labels": serie|map(attribute="fecha")|list, "values": serie|map(attribute="score")|list}|tojson_safe }}'></canvas></div>
+      {% else %}<div class="empty">Tu primera práctica dibuja aquí tu curva de progreso.</div>{% endif %}
+    </div>
+
+    <div class="card">
+      <h2>Sesiones recientes</h2>
+      {% if not recientes %}<div class="empty">Aún no hay sesiones completadas.</div>{% else %}
+      <table><thead><tr><th>Fecha</th><th>Habilidad</th><th>Nivel</th><th>Objetivo</th><th class="tright">Score</th></tr></thead><tbody>
+      {% for s in recientes %}<tr class="link" data-href="/sesion/{{ s.id }}/reporte"><td>{{ s.inicio|fecha_corta }}</td><td>{{ s.habilidad|hab_corto }}</td><td>{{ s.nivel }}{% if s.competencia %} · {{ s.competencia }}{% endif %}</td><td class="muted">{{ s.objetivo[:70] }}</td><td class="tright">{{ m.sem(s.score_global) }}</td></tr>{% endfor %}
+      </tbody></table>{% endif %}
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="card dark">
+      <div class="cap" style="color:rgba(255,255,255,.6)">Tu semana</div>
+      <div class="grid g2">
+        <div class="stat"><span class="v">{{ resumen.sesiones }}</span><span class="l" style="color:rgba(255,255,255,.7)">sesiones</span></div>
+        <div class="stat"><span class="v">{{ resumen.score_promedio|num }}</span><span class="l" style="color:rgba(255,255,255,.7)">score reciente{% if resumen.tendencia is not none %} · <span class="{{ 'up' if resumen.tendencia >= 0 else 'down' }}">{{ '+' if resumen.tendencia >= 0 }}{{ resumen.tendencia }}</span>{% endif %}</span></div>
+        <div class="stat"><span class="v">{{ resumen.racha }}</span><span class="l" style="color:rgba(255,255,255,.7)">semanas de racha</span></div>
+        <div class="stat"><span class="v">{{ resumen.plan.completadas }}<small style="color:rgba(255,255,255,.6)">/{{ resumen.plan.total }}</small></span><span class="l" style="color:rgba(255,255,255,.7)">sesiones del plan</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Mis niveles</h2>
+      <div class="stack">
+        {% for h in habilidades %}
+        <div class="row between"><div><b>{{ h.nombre }}</b><div class="muted tiny">con {{ h.avatar }}</div></div>{{ m.nivel_badge(niveles, h.id) }}</div>
+        {% endfor %}
+      </div>
+      <a class="btn ghost sm mt" href="/mi-diagnostico">Ver mi diagnóstico →</a>
+    </div>
+    <div class="card">
+      <h2>Mis planes</h2>
+      {% for r in roadmaps %}
+      <div class="mb"><div class="row between"><b>{{ r.habilidad|hab_corto }}</b><span class="chip {{ 'mint' if r.estado == 'activo' else 'amber' }}">{{ r.estado }}</span></div>
+        <div class="bar mt" style="margin-top:6px"><i style="width:{{ (r.completadas / r.total * 100) if r.total else 0 }}%"></i></div><div class="muted tiny">{{ r.completadas }} de {{ r.total }} sesiones · {{ r.horizonte_semanas }} semanas</div></div>
+      {% else %}<div class="empty">Sin planes todavía.</div>{% endfor %}
+    </div>
+    {% if notif %}<div class="card"><h2>Avisos</h2><ul class="list">{% for n in notif %}<li><div><b>{{ n.titulo }}</b><div class="muted tiny">{{ n.cuerpo[:90] }}</div></div></li>{% endfor %}</ul></div>{% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

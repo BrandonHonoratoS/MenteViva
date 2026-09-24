@@ -1,0 +1,32 @@
+{% extends "base.html" %}{% block title %}Entrar{% endblock %}
+{% block content %}
+<div class="login">
+  <div class="art">
+    <div class="brand"><img src="/static/logo.svg" alt="" style="width:46px;height:46px"><span><b style="font-size:1.4rem">Mente Viva</b><small>{{ TAGLINE }}</small></span></div>
+    <div>
+      <h1 style="font-size:2.6rem;line-height:1.05;max-width:520px">El gimnasio de <span class="grad-text">habilidades blandas</span> con agentes de IA.</h1>
+      <p class="muted" style="max-width:480px;font-size:1.05rem">No lees ni ves videos: practicas situaciones reales con avatares que mantienen la presión, y la IA mide tu desempeño, te da retroalimentación con evidencia y recalcula tu plan.</p>
+      <div class="grid g2 mt-l" style="max-width:560px">
+        <div class="feature"><div class="ic"><div class="orb xs" style="--c1:#3B82F6;--c2:#06B6D4"></div></div><div><b>Elena Ríos</b><br><span class="muted small">Te entrevista, diagnostica y diseña tus planes.</span></div></div>
+        <div class="feature"><div class="ic"><div class="orb xs"></div></div><div><b>Celeste López</b><br><span class="muted small">La clienta exigente de la Clínica de Ventas.</span></div></div>
+        <div class="feature"><div class="ic"><div class="orb xs" style="--c1:#10B981;--c2:#06B6D4"></div></div><div><b>Juan Artiaga</b><br><span class="muted small">Mentor de la Ruta Delivery Manager.</span></div></div>
+        <div class="feature"><div class="ic"><div class="orb xs" style="--c1:#F59E0B;--c2:#A855F7"></div></div><div><b>El Analista</b><br><span class="muted small">Lee todo, recalcula y orienta a tus líderes.</span></div></div>
+      </div>
+    </div>
+    <p class="soft small">Mente Viva · práctica deliberada + feedback inmediato + roadmap adaptativo.</p>
+  </div>
+  <div class="form">
+    <div class="card">
+      <h2>Entrar</h2><p class="muted small">Usa el correo y la contraseña que te asignó tu empresa.</p>
+      {% if error %}<div class="alert err mb">{{ error }}</div>{% endif %}
+      <form method="post" action="/login">
+        <input type="hidden" name="next" value="{{ next }}">
+        <div class="field"><label>Correo</label><input name="email" type="email" required autofocus autocomplete="username"></div>
+        <div class="field"><label>Contraseña</label><input name="password" type="password" required autocomplete="current-password"></div>
+        <button class="btn primary block lg" type="submit">Entrar</button>
+      </form>
+      <p class="soft tiny mt">Tus conversaciones son privadas: sólo tú y RRHH pueden leerlas. Los líderes ven scores y retroalimentación.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

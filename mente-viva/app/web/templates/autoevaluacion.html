@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% block title %}Autoevaluación{% endblock %}
+{% block subtitulo %}Una vez al mes · alimenta los índices de aplicación y engagement{% endblock %}
+{% block content %}
+<div class="grid g-1-2">
+  <div class="card"><h2>¿Por qué importa?</h2><p class="muted">Practicar es la mitad. La otra mitad es usar lo practicado en tu trabajo real. Tu autoevaluación y la de tu líder se cruzan con tus sesiones para medir aplicación y transferencia.</p>
+    {% if previas %}<div class="cap mt">Anteriores</div>{% for e in previas %}<div class="row between small"><span>{{ e.periodo }}</span><b>{{ e.promedio }}/5</b></div>{% endfor %}{% endif %}</div>
+  <div class="card">
+    {% if ok %}<div class="alert ok mb">Guardado. Gracias por tu honestidad.</div>{% endif %}
+    <form method="post" action="/autoevaluacion"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="cap">Periodo {{ periodo }} · 1 = nada de acuerdo · 5 = totalmente de acuerdo</div>
+      {% for p in preguntas %}<div class="field mt"><label>{{ p.texto }}</label><div class="num-scale">{% for n in range(1,6) %}<label><input type="radio" name="{{ p.id }}" value="{{ n }}" required><span>{{ n }}</span></label>{% endfor %}</div></div>{% endfor %}
+      <div class="field"><label>¿Dónde lo aplicaste? (opcional)</label><textarea name="comentario" placeholder="Ej. usé la técnica de silencio activo con un cliente el martes…"></textarea></div>
+      <button class="btn primary" type="submit">Guardar</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block title %}Historial{% endblock %}
+{% block subtitulo %}{{ resumen.sesiones }} sesiones · score reciente {{ resumen.score_promedio|num }}{% endblock %}
+{% block content %}
+<div class="card mb"><div style="height:240px">{% if serie %}<canvas data-line='{{ {"labels": serie|map(attribute="fecha")|list, "values": serie|map(attribute="score")|list}|tojson_safe }}'></canvas>{% else %}<div class="empty">Sin sesiones todavía.</div>{% endif %}</div></div>
+<div class="card">
+  <table><thead><tr><th>Fecha</th><th>Habilidad</th><th>Tipo</th><th>Nivel</th><th>Objetivo</th><th>Estado</th><th class="tright">Score</th></tr></thead><tbody>
+  {% for s in sesiones %}<tr class="link" data-href="{{ '/sesion/' ~ s.id ~ ('/reporte' if s.estado == 'completada' and s.tipo == 'practica' else ('' if s.estado != 'completada' else '/reporte')) }}">
+    <td>{{ s.inicio|fecha }}</td><td>{{ s.habilidad|hab_corto }}</td><td>{{ s.tipo }}{% if s.voluntaria %} · voluntaria{% endif %}</td><td>{{ s.nivel }}{% if s.competencia %} · {{ s.competencia }}{% endif %}</td><td class="muted small">{{ (s.objetivo or '')[:70] }}</td>
+    <td><span class="chip {{ {'completada':'mint','en_curso':'amber','analizando':'aqua','descartada':'gris','error':'rose'}[s.estado] }}">{{ s.estado }}</span></td><td class="tright">{{ m.sem(s.score_global) if s.tipo == 'practica' else '—' }}</td></tr>
+  {% else %}<tr><td colspan="7" class="empty">Sin sesiones.</td></tr>{% endfor %}
+  </tbody></table>
+</div>
+{% endblock %}

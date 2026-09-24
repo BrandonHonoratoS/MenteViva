@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}{{ APP }}{% endblock %} · {{ APP }}</title>
+<meta name="csrf" content="{{ csrf or '' }}">
+<link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/styles.css">
+{% block head %}{% endblock %}
+</head>
+<body>
+{% import "_macros.html" as m %}
+<div class="shell">
+{% if u %}
+<aside class="sidebar">
+  <a class="brand" href="/"><img src="/static/logo.svg" alt=""><span><b>Mente Viva</b><small>{{ TAGLINE }}</small></span></a>
+  <nav class="nav">
+    {% for href, nombre, icono in nav %}<a href="{{ href }}" class="{{ 'on' if ruta == href or (href != '/' and ruta.startswith(href + '/')) else '' }}">{{ m.icon(icono) }}<span>{{ nombre }}</span></a>{% endfor %}
+    <a href="/notificaciones" class="{{ 'on' if ruta == '/notificaciones' else '' }}">{{ m.icon('bell') }}<span>Avisos</span>{% if no_leidas %}<span class="chip rose" style="margin-left:auto">{{ no_leidas }}</span>{% endif %}</a>
+    <a href="/cuenta" class="{{ 'on' if ruta == '/cuenta' else '' }}">{{ m.icon('key') }}<span>Mi cuenta</span></a>
+    <a href="/salir">{{ m.icon('out') }}<span>Salir</span></a>
+  </nav>
+  <div class="foot">{{ u.nombre }} · {{ NOMBRES_ROL[u.rol] }}{% if u.area_nombre %} · {{ u.area_nombre }}{% endif %}<br>v{{ VERSION }}</div>
+</aside>
+{% endif %}
+<main class="main{% if not u %} bare{% endif %}">
+  {% if u %}
+  <div class="topbar">
+    <div><h1>{% block titulo %}{{ self.title() }}{% endblock %}</h1><p class="sub">{% block subtitulo %}{% endblock %}</p></div>
+    <div class="grow"></div>
+    {% block acciones %}{% endblock %}
+    <a class="bell" href="/notificaciones" title="Avisos">{{ m.icon('bell') }}{% if no_leidas %}<span class="dot"></span>{% endif %}</a>
+    <div class="userbox"><span class="uavatar" style="background:{{ u.color or '#7C3AED' }}">{{ u.nombre[:1] }}</span><div><div class="n">{{ u.nombre }}</div><div class="r">{{ NOMBRES_ROL[u.rol] }}</div></div></div>
+  </div>
+  {% if presupuesto and presupuesto.agotado %}<div class="banner alert err">⛔ El paquete mensual de IA se agotó: los agentes no pueden correr hasta que el equipo Mente Viva amplíe el presupuesto.</div>
+  {% elif presupuesto and presupuesto.aviso %}<div class="banner alert warn">⚠️ El paquete mensual de IA va al {{ presupuesto.pct }} %. Si se agota, los agentes se detienen hasta ampliarlo.</div>{% endif %}
+  {% if llm_simulado %}<div class="banner alert info">🧪 Modo simulado: la IA está desactivada en este servidor (sin GEMINI_API_KEY). Sólo para pruebas.</div>{% endif %}
+  {% endif %}
+  {% block content %}{% endblock %}
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="/static/app.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

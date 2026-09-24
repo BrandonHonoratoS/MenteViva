@@ -1,0 +1,41 @@
+{% extends "base.html" %}{% block title %}Áreas y personas{% endblock %}
+{% block subtitulo %}{{ u.empresa_nombre }} · RRHH crea áreas, asigna roles y da de alta a las personas{% endblock %}
+{% block content %}
+{% if ok %}<div class="alert ok mb">{{ ok }}{% if clave %} · Contraseña temporal: <b class="mono">{{ clave }}</b> (compártela de forma segura; la persona la cambia al entrar).{% endif %}</div>{% endif %}
+{% if error %}<div class="alert err mb">{{ error }}</div>{% endif %}
+<div class="grid g-1-2">
+  <div class="stack">
+    <div class="card"><h2>Nueva área</h2>
+      <form method="post" action="/gestion/areas"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="field"><label>Nombre</label><input name="nombre" required placeholder="Ej. Odoo, Oracle, Comercial"></div>
+        <div class="field"><label>Director (opcional)</label><select name="director_id"><option value="0">— después —</option>{% for x in usuarios if x.activo and x.rol in ('director','colaborador') %}<option value="{{ x.id }}">{{ x.nombre }}</option>{% endfor %}</select></div>
+        <button class="btn primary" type="submit">Crear área</button></form></div>
+    <div class="card"><h2>Áreas</h2>{% for a in areas %}
+      <form method="post" action="/gestion/areas/{{ a.id }}" class="inline-form mb"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="field"><input name="nombre" value="{{ a.nombre }}"></div>
+        <div class="field"><select name="director_id"><option value="0">sin director</option>{% for x in usuarios if x.activo and x.rol in ('director','colaborador') %}<option value="{{ x.id }}" {{ 'selected' if x.id == a.director_id }}>{{ x.nombre }}</option>{% endfor %}</select></div>
+        <button class="btn sm" type="submit">Guardar</button><span class="muted tiny">{{ a.colaboradores }} colab.</span></form>{% else %}<div class="empty">Sin áreas.</div>{% endfor %}</div>
+  </div>
+  <div class="stack">
+    <div class="card"><h2>Nueva persona</h2>
+      <form method="post" action="/gestion/usuarios"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="grid g2"><div class="field"><label>Nombre</label><input name="nombre" required></div><div class="field"><label>Correo</label><input name="email" type="email" required></div>
+        <div class="field"><label>Puesto</label><input name="puesto" placeholder="Ej. Consultor funcional"></div>
+        <div class="field"><label>Rol</label><select name="rol">{% for v, n in roles %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Área</label><select name="area_id"><option value="0">—</option>{% for a in areas %}<option value="{{ a.id }}">{{ a.nombre }}</option>{% endfor %}</select></div></div>
+        <button class="btn primary" type="submit">Crear y generar contraseña temporal</button></form></div>
+    <div class="card"><h2>Personas ({{ usuarios|length }})</h2>
+      <table><thead><tr><th>Nombre</th><th>Rol</th><th>Área</th><th>Estado</th><th></th></tr></thead><tbody>
+      {% for x in usuarios %}<tr><td><b>{{ x.nombre }}</b><div class="muted tiny">{{ x.email }} · {{ x.puesto }}</div></td>
+        <td colspan="2"><form method="post" action="/gestion/usuarios/{{ x.id }}" class="inline-form"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="nombre" value="{{ x.nombre }}"><input type="hidden" name="puesto" value="{{ x.puesto }}">
+          <div class="field"><select name="rol">{% for v, n in roles %}<option value="{{ v }}" {{ 'selected' if v == x.rol }}>{{ n }}</option>{% endfor %}</select></div>
+          <div class="field"><select name="area_id"><option value="0">—</option>{% for a in areas %}<option value="{{ a.id }}" {{ 'selected' if a.id == x.area_id }}>{{ a.nombre }}</option>{% endfor %}</select></div>
+          <button class="btn sm" type="submit">Guardar</button></form></td>
+        <td><span class="chip {{ 'mint' if x.activo else 'gris' }}">{{ 'activo' if x.activo else 'inactivo' }}</span>{% if x.debe_cambiar_password %}<div class="tiny muted">clave temporal</div>{% endif %}</td>
+        <td><div class="row" style="gap:4px"><form method="post" action="/gestion/usuarios/{{ x.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="restablecer"><button class="btn sm" type="submit" title="Nueva contraseña temporal">🔑</button></form>
+          <form method="post" action="/gestion/usuarios/{{ x.id }}" data-confirm="¿Cambiar el estado de esta cuenta?"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="{{ 'desactivar' if x.activo else 'activar' }}"><button class="btn sm {{ 'danger' if x.activo }}" type="submit">{{ 'Baja' if x.activo else 'Alta' }}</button></form>
+          {% if x.rol in ('colaborador','director') %}<a class="btn sm" href="/colaborador/{{ x.id }}">Ficha</a>{% endif %}</div></td></tr>{% endfor %}
+      </tbody></table></div>
+  </div>
+</div>
+{% endblock %}

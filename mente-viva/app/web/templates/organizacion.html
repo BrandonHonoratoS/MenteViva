@@ -1,0 +1,54 @@
+{% extends "base.html" %}{% block title %}{{ titulo }}{% endblock %}
+{% block subtitulo %}{{ u.empresa_nombre }} · últimos {{ dias }} días · {{ k.colaboradores }} colaboradores · {{ k.sesiones_periodo }} sesiones{% endblock %}
+{% block acciones %}
+<form method="get" class="row" style="gap:6px"><select name="dias" onchange="this.form.submit()" style="width:auto">{% for d in [7,30,90,365] %}<option value="{{ d }}" {{ 'selected' if d == dias }}>{{ d }} días</option>{% endfor %}</select></form>
+<a class="btn sm" href="/exportar/tablero.xlsx?dias={{ dias }}">{{ m.icon('download') }} Excel</a>
+{% endblock %}
+{% block content %}
+{% set I = k.indices %}
+<div class="grid g4 mb">
+  <div class="card dark stat tooltip"><span class="l" style="color:rgba(255,255,255,.7)">{{ I.iiho.nombre }}</span><span class="v">{{ I.iiho.valor if I.iiho.valor is not none else '—' }}<small style="color:rgba(255,255,255,.6)">/100</small></span>
+    <span class="d" style="color:rgba(255,255,255,.7)">Desarrollo {{ I.iiho.componentes['Desarrollo']|num }} · Práctica {{ I.iiho.componentes['Práctica']|num }} · Aplicación {{ I.iiho.componentes['Aplicación']|num }} · Cultura {{ I.iiho.componentes['Cultura']|num }}</span>
+    <span class="tip"><b>¿Cómo se calcula?</b><br>{{ I.iiho.formula }}</span></div>
+  {{ m.kpi_tile(k, 'idss') }}{{ m.kpi_tile(k, 'madurez') }}{{ m.kpi_tile(k, 'participacion') }}
+</div>
+<div class="grid g4 mb">
+  {{ m.kpi_tile(k, 'nivel_habilidad') }}{{ m.kpi_tile(k, 'practica') }}{{ m.kpi_tile(k, 'engagement') }}{{ m.kpi_tile(k, 'aplicacion') }}
+</div>
+<div class="grid g4 mb">
+  {{ m.kpi_tile(k, 'transferencia') }}{{ m.kpi_tile(k, 'evolucion') }}{{ m.kpi_tile(k, 'autodesarrollo') }}
+  <div class="card stat"><span class="l">Interacción colaborativa</span><span class="v">—</span><span class="d muted">Cultura · próximamente (sesiones grupales)</span></div>
+</div>
+<p class="soft tiny mb">Pasa el cursor sobre cada índice para ver su fórmula y componentes. Los índices de aplicación, transferencia y evolución requieren evaluaciones del líder.</p>
+
+<div class="grid g-2-1 mb">
+  <div class="card"><div class="row between"><h2>Sesiones y score por semana</h2></div><div style="height:240px"><canvas data-line='{{ {"labels": k.serie|map(attribute="semana")|list, "values": k.serie|map(attribute="score")|list}|tojson_safe }}'></canvas></div>
+    <div class="row mt" style="gap:6px">{% for w in k.serie %}<span class="chip gris">{{ w.semana[-3:] }}: {{ w.sesiones }}</span>{% endfor %}</div></div>
+  <div class="card"><h2>Ruta Delivery Manager</h2><div style="height:200px"><canvas data-bar='{{ {"labels": k.distribucion_dm.keys()|list, "values": k.distribucion_dm.values()|list, "colors": "#A855F7"}|tojson_safe }}'></canvas></div>
+    <div class="muted tiny mt">Colaboradores por nivel actual. Los ascensos los propone el Analista y los aprueba RRHH.</div></div>
+</div>
+
+<div class="grid g3 mb">
+  <div class="card"><h2>Top 3</h2><ul class="list">{% for t in k.top %}<li><span class="uavatar" style="background:{{ t.color }};width:30px;height:30px;font-size:.8rem">{{ t.nombre[:1] }}</span><div style="flex:1"><a href="/colaborador/{{ t.id }}"><b>{{ t.nombre }}</b></a><div class="muted tiny">{{ t.area }} · {{ t.sesiones }} sesiones</div></div>{{ m.sem(t.score_promedio) }}</li>{% else %}<li class="muted small">Sin sesiones aún.</li>{% endfor %}</ul></div>
+  <div class="card"><h2>Requieren atención</h2><ul class="list">{% for a in k.atencion[:6] %}<li><span class="n" style="background:rgba(244,63,94,.12);color:#BE123C">!</span><div style="flex:1"><a href="/colaborador/{{ a.id }}"><b>{{ a.nombre }}</b></a><div class="muted tiny">{% if a.dias_inactivo is not none and a.dias_inactivo >= 7 %}{{ a.dias_inactivo }} días sin practicar · {% endif %}{% if a.tendencia is not none and a.tendencia <= -10 %}tendencia {{ a.tendencia }} · {% endif %}score {{ a.score_promedio|num }}</div></div></li>{% else %}<li class="muted small">Nadie en alerta. 🎉</li>{% endfor %}</ul>
+    {% if k.sin_diagnostico %}<div class="muted tiny mt">Sin diagnóstico: {{ k.sin_diagnostico|map(attribute='nombre')|join(', ') }}</div>{% endif %}</div>
+  <div class="card"><h2>Lecturas del Analista</h2><ul class="list">{% for a in analisis %}<li><div><b>{{ a.titulo }}</b><div class="muted tiny">{{ a.tipo }} · {{ a.creado_en|fecha_corta }}</div><div class="small">{{ (a.contenido.resumen or a.contenido.lectura or '')[:160] }}</div></div></li>{% else %}<li class="muted small">El Analista escribirá aquí después de las primeras sesiones.</li>{% endfor %}</ul><a class="btn ghost sm" href="/analisis">Ver todos →</a></div>
+</div>
+
+{% if k.por_area %}
+<div class="card mb"><h2>Por área</h2>
+  <table><thead><tr><th>Área</th><th>Director</th><th class="tright">Colaboradores</th><th class="tright">Activos</th><th class="tright">Sesiones</th><th class="tright">Score</th><th class="tright">Atención</th></tr></thead><tbody>
+  {% for a in k.por_area %}<tr><td><b>{{ a.nombre }}</b></td><td class="muted">{{ a.director or '—' }}</td><td class="tright">{{ a.colaboradores }}</td><td class="tright">{{ a.activos }}</td><td class="tright">{{ a.sesiones }}</td><td class="tright">{{ m.sem(a.score) }}</td><td class="tright">{{ a.atencion }}</td></tr>{% endfor %}
+  </tbody></table></div>
+{% endif %}
+
+{% if k.radar %}
+<div class="grid g3 mb">{% for h, r in k.radar.items() %}<div class="card"><h2>{{ h|hab_corto }} · KPIs promedio</h2><div style="height:220px"><canvas data-radar='{{ {"labels": r|map(attribute="nombre")|list, "values": r|map(attribute="score")|list}|tojson_safe }}'></canvas></div></div>{% endfor %}</div>
+{% endif %}
+
+<div class="card"><h2>Colaboradores</h2>
+  <table><thead><tr><th>Nombre</th><th>Área</th><th>Ventas</th><th>Entrevistas</th><th>Ruta DM</th><th class="tright">Sesiones</th><th class="tright">Score</th><th class="tright">Tendencia</th><th>Última actividad</th></tr></thead><tbody>
+  {% for r in k.colaboradores_resumen %}<tr class="link" data-href="/colaborador/{{ r.id }}"><td><b>{{ r.nombre }}</b><div class="muted tiny">{{ r.puesto }}</div></td><td>{{ r.area }}</td><td>{{ r.niveles.get('ventas','—') }}</td><td>{{ r.niveles.get('entrevistas','—') }}</td><td>{{ r.niveles.get('ruta_dm','—') }}</td><td class="tright">{{ r.sesiones }}</td><td class="tright">{{ m.sem(r.score_promedio) }}</td><td class="tright {{ 'up' if (r.tendencia or 0) > 0 else ('down' if (r.tendencia or 0) < 0 else '') }}">{{ ('+' if r.tendencia > 0 else '') ~ r.tendencia if r.tendencia is not none else '—' }}</td><td class="muted">{{ r.ultima_actividad or 'nunca' }}</td></tr>{% endfor %}
+  </tbody></table></div>
+{% if propuestas %}<div class="card mt"><div class="row between"><h2>Aprobaciones pendientes</h2><a class="btn sm" href="/aprobaciones">Ver todas</a></div><ul class="list">{% for p in propuestas %}<li><span class="chip {{ {'ascenso_dm':'mint','roadmap':'aqua','refuerzo':'amber','alerta':'rose','ajuste':'gris','meta':'gris'}[p.tipo] }}">{{ p.tipo }}</span><div><b>{{ p.titulo }}</b><div class="muted tiny">{{ p.evidencia[:120] }}</div></div></li>{% endfor %}</ul></div>{% endif %}
+{% endblock %}

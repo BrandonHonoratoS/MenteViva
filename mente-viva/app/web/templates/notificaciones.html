@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block title %}Avisos{% endblock %}
+{% block content %}
+<div class="card">
+  {% if not lista %}<div class="empty">Sin avisos todavía.</div>{% endif %}
+  <ul class="list">
+  {% for n in lista %}
+    <li><span class="n">{{ {'exito':'✓','aviso':'!','alerta':'⚠','info':'i'}.get(n.tipo,'i') }}</span>
+      <div style="flex:1"><b>{{ n.titulo }}</b>{% if n.cuerpo %}<div class="muted small">{{ n.cuerpo }}</div>{% endif %}<div class="soft tiny">{{ n.creado_en|fecha }}</div></div>
+      {% if n.enlace %}<a class="btn sm" href="{{ n.enlace }}">Abrir</a>{% endif %}</li>
+  {% endfor %}
+  </ul>
+</div>
+{% endblock %}
