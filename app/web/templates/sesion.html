@@ -24,9 +24,10 @@
     <div class="card">
       <div class="cap">{{ 'Objetivo de la entrevista' if s.tipo == 'diagnostico' else 'Objetivo de la sesión' }}</div>
       <p>{{ s.objetivo or 'Conocer tus competencias con ejemplos reales.' }}</p>
-      {% if esc.encuadre %}<div class="cap mt">Encuadre</div><p class="small">{{ esc.encuadre }}</p>{% endif %}
-      {% if esc.situacion %}<div class="cap mt">Situación</div><p class="small">{{ esc.situacion }}</p>{% endif %}
-      {% if esc.formato %}<span class="chip">{{ NOMBRE_FORMATO.get(esc.formato, esc.formato) }}</span>{% endif %}
+      <div id="esc-box" style="display:{{ 'block' if esc.titulo else 'none' }}"><div class="cap mt">Escenario</div><b id="esc-titulo">{{ esc.titulo }}</b>
+        <div class="cap mt">Encuadre</div><p class="small" id="esc-encuadre">{{ esc.encuadre }}</p>
+        <div class="cap mt">Situación</div><p class="small" id="esc-situacion">{{ esc.situacion }}</p>
+        {% if esc.formato %}<span class="chip">{{ NOMBRE_FORMATO.get(esc.formato, esc.formato) }}</span>{% endif %}</div>
       {% if s.agente == 'celeste' %}<div class="cap mt">Recuerda</div><p class="small muted">Pregunta antes de presentar. Valida → aísla → diagnostica → técnica. Escribe <b>(silencio)</b> para usar el silencio activo tras una pregunta de cierre.</p>{% endif %}
     </div>
     {% if propia and s.estado == 'en_curso' %}

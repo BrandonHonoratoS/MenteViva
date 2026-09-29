@@ -43,7 +43,7 @@ def diagnostico(request: Request, u: dict = Depends(colab)):
     if perfil.get("estado") == "completo":
         return RedirectResponse("/mi-diagnostico", status_code=307)
     sesion = db.sesion_en_curso(u["id"])
-    if sesion and sesion["tipo"] != "diagnostico":
+    if sesion:
         return RedirectResponse(f"/sesion/{sesion['id']}", status_code=307)
     if perfil.get("estado") == "analizando" and perfil.get("sesion_diagnostico_id"):
         return RedirectResponse(f"/sesion/{perfil['sesion_diagnostico_id']}", status_code=307)
@@ -59,8 +59,9 @@ def diagnostico_iniciar(request: Request, u: dict = Depends(colab), csrf: str = 
     perfil = db.perfil(u["id"])
     if perfil.get("estado") not in ("onboarding", "entrevista"):
         raise HTTPException(400, "Primero responde el cuestionario de perfil.")
-    if db.sesion_en_curso(u["id"]):
-        return RedirectResponse("/diagnostico", status_code=303)
+    abierta = db.sesion_en_curso(u["id"])
+    if abierta:
+        return RedirectResponse(f"/sesion/{abierta['id']}", status_code=303)
     try:
         s = motor.iniciar(db.usuario(u["id"]), "entrevistas", tipo="diagnostico", nivel="Intermedio", objetivo="Diagnóstico inicial de competencias")
     except (PresupuestoAgotado, ErrorLLM) as e:
@@ -76,6 +77,19 @@ def mi_diagnostico(request: Request, u: dict = Depends(colab)):
         return RedirectResponse("/diagnostico", status_code=307)
     return render(request, "mi_diagnostico.html", u, perfil=perfil, diag=perfil.get("diagnostico") or {}, niveles=db.niveles(u["id"]),
                   roadmaps=db.roadmaps(u["id"], ("activo", "propuesto")), competencias=C.COMPETENCIAS_DIAGNOSTICO)
+
+
+@router.post("/diagnostico/planes")
+def diagnostico_planes(request: Request, u: dict = Depends(colab), csrf: str = Form("")):
+    """Regenera los planes que faltaron (fallo transitorio de la IA al cerrar el diagnóstico)."""
+    verificar_csrf(request, u, csrf)
+    from ..agents import roadmap
+    try:
+        creados = roadmap.generar_roadmaps_faltantes(db.usuario(u["id"]))
+    except (PresupuestoAgotado, ErrorLLM) as e:
+        raise HTTPException(503, str(e))
+    db.log("info", "roadmap", f"Planes regenerados para {u['email']}", ", ".join(creados), u["email"])
+    return RedirectResponse("/roadmaps", status_code=303)
 
 
 @router.post("/diagnostico/repetir")

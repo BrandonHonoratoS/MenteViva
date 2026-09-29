@@ -22,8 +22,10 @@
         <div class="grid g2"><div class="field"><label>Nombre</label><input name="nombre" required></div><div class="field"><label>Correo</label><input name="email" type="email" required></div>
         <div class="field"><label>Puesto</label><input name="puesto" placeholder="Ej. Consultor funcional"></div>
         <div class="field"><label>Rol</label><select name="rol">{% for v, n in roles %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select></div>
-        <div class="field"><label>Área</label><select name="area_id"><option value="0">—</option>{% for a in areas %}<option value="{{ a.id }}">{{ a.nombre }}</option>{% endfor %}</select></div></div>
-        <button class="btn primary" type="submit">Crear y generar contraseña temporal</button></form></div>
+        <div class="field"><label>Área</label><select name="area_id"><option value="0">—</option>{% for a in areas %}<option value="{{ a.id }}">{{ a.nombre }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Contraseña (opcional, mín. 10)</label><input name="password" type="text" placeholder="vacío = temporal generada"></div></div>
+        <button class="btn primary" type="submit">Crear persona</button>
+        <p class="muted tiny mt">Sin contraseña se genera una temporal que aparece arriba en verde; con contraseña, la persona entra directo con ella.</p></form></div>
     <div class="card"><h2>Personas ({{ usuarios|length }})</h2>
       <table><thead><tr><th>Nombre</th><th>Rol</th><th>Área</th><th>Estado</th><th></th></tr></thead><tbody>
       {% for x in usuarios %}<tr><td><b>{{ x.nombre }}</b><div class="muted tiny">{{ x.email }} · {{ x.puesto }}</div></td>

@@ -1,4 +1,4 @@
-# Mente Viva · v1.0.0
+# Mente Viva · v1.0.3
 
 **El gimnasio de habilidades blandas con agentes de IA.** Plataforma web (FastAPI + Gemini) donde las personas practican situaciones reales con avatares conversacionales que mantienen la presión, reciben retroalimentación con evidencia y siguen un roadmap que la IA recalcula después de cada sesión. Cinco perfiles ven lo que les importa: Colaborador, Director de área, Recursos Humanos, Dirección General y el equipo Mente Viva (superadministrador).
 
@@ -47,8 +47,8 @@ app/
   reports/         PDF (reportlab) y Excel (openpyxl) · scheduler.py  alertas e informes semanales
   routes/          auth · colaborador · api · gestion (RRHH) · tableros (DG/director) · admin · exportes
   web/             plantillas Jinja2 + estilos claros/futuristas + app.js (chat, wizard, gráficas Chart.js)
-tests/             flujo completo con LLM simulado (10 pruebas)
-scripts/demo_local.py  datos de demostración locales (sin API key)
+tests/             flujo completo con LLM simulado + resiliencia ante fallos de la IA (13 pruebas)
+scripts/demo_local.py  datos de demostración locales (sin API key) · scripts/probar_agentes.py  prueba real de los 4 agentes
 docs/              DESPLIEGUE · ARQUITECTURA · AGENTES · METRICAS · SEGURIDAD
 ```
 
@@ -60,7 +60,8 @@ cp .env.example .env            # captura GEMINI_API_KEY (o deja LLM_PROVEEDOR=s
 set -a; source .env; set +a
 uvicorn app.main:app --reload
 # demo con datos simulados (sin key): DATA_DIR=./data_demo LLM_PROVEEDOR=stub ANALISIS_SINCRONO=1 python scripts/demo_local.py
-pytest -q
+pytest -q                                   # 14 pruebas con IA simulada
+python scripts/probar_agentes.py            # con GEMINI_API_KEY: recorre los 4 agentes con IA real y reporta cada paso
 ```
 
 Despliegue paso a paso en Render + AI Studio: `docs/DESPLIEGUE.md`.

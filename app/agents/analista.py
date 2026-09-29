@@ -14,6 +14,7 @@ from ..llm.gemini import ErrorLLM
 from . import catalogo as C
 from . import esquemas as E
 from . import prompts as P
+from . import validar as V
 from .avatares import json_compacto
 
 log = logging.getLogger("mv.analista")
@@ -113,9 +114,9 @@ def _narrativa_post_sesion(sesion, usuario, hab, scores, nivel_actual, nuevo_niv
     try:
         r = llm.generar(origen="analista.post_sesion", system=P.ANALISTA_POST_SESION.format(sube=C.REGLAS_NIVEL["sube"], sube_sesiones=C.REGLAS_NIVEL["sube_sesiones"],
                                                                                           baja=C.REGLAS_NIVEL["baja"], refuerzo=C.REGLAS_NIVEL["refuerzo_sin_mejora"]),
-                        contents=[{"role": "user", "text": json_compacto(datos)}], schema=E.ANALISTA_POST, clase="ligero", thinking="low", max_tokens=700,
+                        contents=[{"role": "user", "text": json_compacto(datos)}], schema=E.ANALISTA_POST, clase="ligero", thinking="low", max_tokens=2000,
                         temperatura=0.3, usuario_id=usuario["id"], sesion_id=sesion["id"])
-        return r.json if isinstance(r.json, dict) else None
+        return V.analista_post(r.json)
     except (PresupuestoAgotado, ErrorLLM) as e:
         db.log("warn", "analista", "Sin narrativa post-sesión", str(e), usuario["email"])
         return None
@@ -250,7 +251,7 @@ def resumen_periodico(empresa_id: int, audiencia: str = "organizacion", area_id:
     aud = "el director del área" if audiencia == "area" else "Dirección General y RRHH"
     try:
         r = llm.generar(origen="analista.resumen", system=P.ANALISTA_RESUMEN.format(audiencia=aud), contents=[{"role": "user", "text": json_compacto(datos)}],
-                        schema=E.ANALISTA_RESUMEN, clase="ligero", thinking="low", max_tokens=900, temperatura=0.3)
+                        schema=E.ANALISTA_RESUMEN, clase="ligero", thinking="low", max_tokens=2000, temperatura=0.3)
     except (PresupuestoAgotado, ErrorLLM) as e:
         db.log("warn", "analista", "Sin resumen periódico", str(e))
         return None
@@ -269,7 +270,7 @@ def resumen_periodico(empresa_id: int, audiencia: str = "organizacion", area_id:
 # ── investigación con fuentes ────────────────────────────────────────────────
 def investigar(tema: str, usuario: dict, guardar: bool = True) -> dict:
     r = llm.generar(origen="analista.investigar", system=P.INVESTIGAR, contents=[{"role": "user", "text": tema[:500]}], grounding=True, thinking="low",
-                    max_tokens=900, temperatura=0.2, usuario_id=usuario["id"])
+                    max_tokens=2000, temperatura=0.2, usuario_id=usuario["id"])
     fuentes = r.fuentes
     texto = r.texto
     if not fuentes:
@@ -372,7 +373,7 @@ def chat(u: dict, texto: str) -> dict:
     herramientas_usadas: list[str] = []
     respuesta = ""
     for _ in range(5):
-        r = llm.generar(origen="analista.chat", system=system, contents=contents, herramientas=HERRAMIENTAS, thinking="low", max_tokens=900, temperatura=0.3, usuario_id=u["id"])
+        r = llm.generar(origen="analista.chat", system=system, contents=contents, herramientas=HERRAMIENTAS, thinking="low", max_tokens=2500, temperatura=0.3, usuario_id=u["id"])
         if not r.llamadas_funcion:
             respuesta = r.texto
             break
@@ -407,6 +408,6 @@ def coach_reporte(u: dict, sesion: dict, texto: str) -> dict:
     contents = [{"role": "user" if m["rol"] == "usuario" else "model", "text": m["texto"]} for m in hist]
     if not contents or contents[-1]["text"] != texto:
         contents.append({"role": "user", "text": texto})
-    r = llm.generar(origen="coach.reporte", system=system, contents=contents, thinking="low", max_tokens=500, temperatura=0.5, usuario_id=u["id"], sesion_id=sesion["id"])
+    r = llm.generar(origen="coach.reporte", system=system, contents=contents, thinking="low", max_tokens=1200, temperatura=0.5, usuario_id=u["id"], sesion_id=sesion["id"])
     db.guardar_chat_mensaje(ch["id"], "coach", r.texto)
     return {"texto": r.texto}

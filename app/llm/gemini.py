@@ -64,6 +64,48 @@ def costo_usd(modelo: str, tok_in: int, tok_out: int, tok_think: int = 0, tok_ca
     return round(max(c, 0.0), 6)
 
 
+TRANSITORIOS = ("429", "503", "500", "502", "504", "timeout", "Timeout", "RESOURCE_EXHAUSTED", "UNAVAILABLE", "overloaded", "high demand", "Deadline")
+
+
+def _transitorio(msg: str) -> bool:
+    return any(k in msg for k in TRANSITORIOS)
+
+
+def _mensaje_error(msg: str) -> str:
+    if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
+        return "El modelo de IA alcanzó su límite de peticiones por minuto (nivel gratuito). Espera 30–60 segundos y pulsa Reintentar."
+    if _transitorio(msg):
+        return "El modelo de IA está saturado en este momento (alta demanda). Pulsa Reintentar; si persiste, espera un minuto."
+    if "API key" in msg or "API_KEY" in msg or "401" in msg or "403" in msg:
+        return "La API key de Gemini no es válida o no tiene permisos. Revísala en Render → Environment."
+    return f"La IA no respondió ({msg[:120]}). Intenta de nuevo en un momento."
+
+
+_SATURADO: dict[str, float] = {}     # modelo → hasta cuándo evitarlo (epoch)
+SATURADO_SEG = 180
+
+
+def _thinking_config(types, modelo: str, nivel: str | None):
+    """Gemini 3.x usa thinking_level; 2.5 usa thinking_budget. 'off' desactiva donde se puede."""
+    if not nivel:
+        return None
+    if modelo.startswith("gemini-2.5"):
+        presupuesto = {"off": 0, "low": 512, "medium": 2048, "high": 8192}.get(nivel, 512)
+        if "pro" in modelo and presupuesto == 0:
+            presupuesto = 128   # 2.5 Pro no permite desactivar el pensamiento
+        return types.ThinkingConfig(thinking_budget=presupuesto)
+    if nivel == "off":
+        return None if "lite" in modelo else types.ThinkingConfig(thinking_level="low")
+    return types.ThinkingConfig(thinking_level=nivel)
+
+
+def modelos_respaldo() -> list[str]:
+    conf = db.get_ajuste("modelos_respaldo", None)
+    if isinstance(conf, list) and conf:
+        return [str(m) for m in conf]
+    return list(settings.GEMINI_FALLBACKS)
+
+
 def modelo_para(clase: str) -> str:
     if clase == "ligero":
         return db.get_ajuste("modelo_ligero", settings.GEMINI_MODEL_LIGERO)
@@ -186,8 +228,6 @@ class LLM:
                                "safety_settings": [types.SafetySetting(category=cat, threshold="BLOCK_ONLY_HIGH") for cat in (
                                    "HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH", "HARM_CATEGORY_DANGEROUS_CONTENT")]}
         nivel_think = thinking or (settings.GEMINI_THINKING_AVATAR if clase == "principal" else "low")
-        if nivel_think and nivel_think != "off":
-            cfg["thinking_config"] = types.ThinkingConfig(thinking_level=nivel_think)
         if schema:
             cfg["response_mime_type"] = "application/json"
             cfg["response_json_schema"] = schema
@@ -204,21 +244,43 @@ class LLM:
         if tools:
             cfg["tools"] = tools
 
+        # Cadena de modelos: el principal y, si está saturado (503/429/500), los de respaldo en orden.
+        cadena = [modelo] + [m for m in modelos_respaldo() if m != modelo]
+        ahora = time.time()
+        cadena = [m for m in cadena if _SATURADO.get(m, 0) < ahora] + [m for m in cadena if _SATURADO.get(m, 0) >= ahora]   # los saturados al final
+        resp = None
         ultimo_error: Exception | None = None
-        for intento in range(reintentos + 1):
-            try:
-                resp = self._client().models.generate_content(model=modelo, contents=partes_contents, config=types.GenerateContentConfig(**cfg))
+        for idx, mdl in enumerate(cadena):
+            sin_thinking = False
+            for intento in range(reintentos + 1):
+                try:
+                    cfg_m = dict(cfg)
+                    tc = None if sin_thinking else _thinking_config(types, mdl, nivel_think)
+                    if tc is not None:
+                        cfg_m["thinking_config"] = tc
+                    resp = self._client().models.generate_content(model=mdl, contents=partes_contents, config=types.GenerateContentConfig(**cfg_m))
+                    break
+                except Exception as e:  # noqa: BLE001 — la API puede fallar por red/cuota; se reintenta con espera
+                    ultimo_error = e
+                    if _transitorio(str(e)) and intento < reintentos:
+                        time.sleep(min(8.0, 1.5 * (2 ** intento)) + random.random())
+                        continue
+                    if not _transitorio(str(e)) and "thinking" in str(e).lower() and not sin_thinking:
+                        sin_thinking = True    # el modelo no acepta esa configuración de pensamiento: se repite sin ella
+                        continue
+                    if not _transitorio(str(e)):
+                        db.log("error", "llm", f"Fallo de Gemini en {origen}", str(e)[:500], str(usuario_id or ""))
+                        raise ErrorLLM(_mensaje_error(str(e))) from e
+                    _SATURADO[mdl] = time.time() + SATURADO_SEG   # se evita este modelo unos minutos
+                    break   # transitorio y sin reintentos: probar el siguiente modelo
+            if resp is not None:
+                if mdl != modelo:
+                    db.log("warn", "llm", f"Modelo de respaldo usado en {origen}", f"{modelo} → {mdl}", str(usuario_id or ""))
+                modelo = mdl
                 break
-            except Exception as e:  # noqa: BLE001 — la API puede fallar por red/cuota; se reintenta con espera
-                ultimo_error = e
-                msg = str(e)
-                if intento < reintentos and any(k in msg for k in ("429", "503", "500", "timeout", "Timeout", "RESOURCE_EXHAUSTED", "UNAVAILABLE")):
-                    time.sleep(1.5 * (intento + 1) + random.random())
-                    continue
-                db.log("error", "llm", f"Fallo de Gemini en {origen}", msg[:500], str(usuario_id or ""))
-                raise ErrorLLM(f"La IA no respondió ({msg[:120]}). Intenta de nuevo en un momento.") from e
-        else:  # pragma: no cover
-            raise ErrorLLM(str(ultimo_error))
+        if resp is None:
+            db.log("error", "llm", f"Gemini saturado en {origen}", str(ultimo_error)[:500], str(usuario_id or ""))
+            raise ErrorLLM(_mensaje_error(str(ultimo_error))) from ultimo_error
 
         ms = int((time.time() - inicio) * 1000)
         um = getattr(resp, "usage_metadata", None)

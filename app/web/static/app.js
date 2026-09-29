@@ -74,15 +74,43 @@
       if (m.historias != null) $('#hist-v').textContent = m.historias;
     }
     setInterval(() => { if (fin) return; const s = Math.max(0, Math.floor((Date.now() - inicio) / 1000)); const m = Math.floor(s / 60); $('#timer').textContent = m + ':' + String(s % 60).padStart(2, '0'); $('#timer').classList.toggle('down', m >= dur); }, 1000);
+    let pendiente = false;   // hay un mensaje del usuario (o la apertura) sin respuesta del avatar
+    function errorConReintento(msg) {
+      const d = add('sistema', msg); const b = document.createElement('button'); b.className = 'btn sm'; b.style.marginLeft = '8px'; b.textContent = 'Reintentar';
+      b.onclick = () => { d.remove(); continuar(); }; d.appendChild(b);
+    }
+    function aplicar(r) {
+      orb.classList.add('talking'); setTimeout(() => orb.classList.remove('talking'), 2500);
+      if (r.mensaje) add('avatar', r.mensaje, ses.dataset.avatar);
+      meta(r.meta || {}); if (r.turnos != null) { turnos = r.turnos; $('#turnos').textContent = turnos + ' / ' + r.turnos_max; }
+      if (r.escenario && r.escenario.titulo && $('#esc-titulo')) { $('#esc-titulo').textContent = r.escenario.titulo; $('#esc-encuadre').textContent = r.escenario.encuadre || ''; $('#esc-situacion').textContent = r.escenario.situacion || ''; $('#esc-box').style.display = 'block'; }
+      pendiente = false;
+      if (r.fin) finalizar();
+    }
+    async function continuar(auto) {
+      if (fin) return; btn.disabled = true; typing(true);
+      try { const r = await api('/api/sesiones/' + id + '/continuar'); typing(false); aplicar(r); }
+      catch (e) {
+        typing(false);
+        if (auto && /satur|límite|demanda/i.test(e.message)) { add('sistema', 'La IA está saturada; reintento en 6 segundos…'); setTimeout(() => continuar(false), 6000); }
+        else errorConReintento(e.message);
+        if (/agotó|presupuesto/i.test(e.message)) fin = true;
+      }
+      btn.disabled = false;
+    }
     async function enviar(txt) {
       const texto = (txt ?? ta.value).trim(); if (!texto || fin) return;
-      ta.value = ''; btn.disabled = true; add('usuario', texto); typing(true);
+      if (pendiente) { continuar(); return; }
+      ta.value = ''; btn.disabled = true; add('usuario', texto); typing(true); pendiente = true;
       try {
         const r = await api('/api/sesiones/' + id + '/mensaje', { texto });
-        typing(false); orb.classList.add('talking'); setTimeout(() => orb.classList.remove('talking'), 2500);
-        add('avatar', r.mensaje, ses.dataset.avatar); meta(r.meta || {}); turnos = r.turnos; $('#turnos').textContent = turnos + ' / ' + r.turnos_max;
-        if (r.fin) { finalizar(); }
-      } catch (e) { typing(false); add('sistema', e.message); if (/agotó|presupuesto/i.test(e.message)) fin = true; }
+        typing(false); aplicar(r);
+      } catch (e) {
+        typing(false);
+        if (/agotó|presupuesto/i.test(e.message)) { add('sistema', e.message); fin = true; }
+        else if (/Escribe algo|ya terminó/i.test(e.message)) { add('sistema', e.message); pendiente = false; }
+        else errorConReintento(e.message);
+      }
       btn.disabled = false; ta.focus();
     }
     function finalizar() { fin = true; ses.dataset.estado = 'analizando'; $('#composer').style.display = 'none'; $('#analizando').style.display = 'flex'; orb.classList.add('thinking'); poll(); }
@@ -102,6 +130,8 @@
     $('#descartar')?.addEventListener('click', async () => { if (!confirm('¿Descartar esta sesión? No se analizará.')) return; try { await api('/api/sesiones/' + id + '/descartar'); location.href = ses.dataset.salida || '/hoy'; } catch (e) { toast(e.message); } });
     if (ses.dataset.estado === 'analizando') finalizar();
     if (ses.dataset.estado === 'error') { finalizar(); }
+    // Sin apertura del avatar (o último mensaje del usuario sin respuesta): pedirla ahora, con reintento automático.
+    if (ses.dataset.estado === 'en_curso') { const ms = $$('#msgs .msg'); const ultimo = ms[ms.length - 1]; if (!ultimo || ultimo.classList.contains('usuario')) { pendiente = !!ultimo; continuar(true); } }
     scroll(); ta?.focus();
   }
 

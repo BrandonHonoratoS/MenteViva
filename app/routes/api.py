@@ -51,6 +51,30 @@ async def mensaje(sid: int, request: Request, u: dict = Depends(requiere_usuario
             "turnos_max": C.turnos_max(s["habilidad"], s.get("nivel")), "fin": fin}
 
 
+@router.post("/sesiones/{sid}/continuar")
+async def continuar(sid: int, request: Request, u: dict = Depends(requiere_usuario)):
+    """Reintenta lo que falte (diseño, apertura o respuesta pendiente) tras un fallo transitorio de la IA."""
+    body = await _json(request)
+    verificar_csrf(request, u, body.get("csrf"))
+    s = _sesion_propia(sid, u)
+    try:
+        r = motor.continuar(s, db.usuario(u["id"]))
+    except motor.SesionOcupada as e:
+        raise HTTPException(409, str(e))
+    except PresupuestoAgotado as e:
+        raise HTTPException(402, str(e))
+    except ErrorLLM as e:
+        raise HTTPException(503, str(e))
+    s = db.sesion(sid)
+    fin = bool(r) and (r.get("estado") == "fin" or r.get("fase") == "fin")
+    if fin:
+        motor.terminar(s, db.usuario(u["id"]), en_hilo=not settings.ANALISIS_SINCRONO)
+    mensajes = db.mensajes(sid)
+    return {"mensaje": (r or {}).get("texto"), "meta": {k: v for k, v in (r or {}).items() if k != "texto"}, "turnos": s["turnos"],
+            "turnos_max": C.turnos_max(s["habilidad"], s.get("nivel")), "fin": fin, "n_mensajes": len([m for m in mensajes if m["rol"] in ("usuario", "avatar")]),
+            "escenario": {k: (s.get("escenario") or {}).get(k) for k in ("titulo", "encuadre", "situacion", "formato", "personaje")}}
+
+
 @router.post("/sesiones/{sid}/terminar")
 async def terminar(sid: int, request: Request, u: dict = Depends(requiere_usuario)):
     body = await _json(request)

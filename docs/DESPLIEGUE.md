@@ -39,6 +39,10 @@ Si prefieres crearlo a mano (sin Blueprint): *New → Web Service* → runtime P
 3. Cada colaborador: *Hoy → Empezar mi diagnóstico* (cuestionario + entrevista con Elena, ~25 min). Al terminar aparecen sus niveles y planes; los planes de habilidades fuera de su rol quedan en *Aprobaciones* para RRHH.
 4. Directores: registran la **evaluación del líder** cada mes (`/equipo → Evaluar`) para activar los índices de aplicación y transferencia.
 
+## 4b. Si la IA responde "saturado" o "límite de peticiones"
+
+En el nivel gratuito de Gemini los modelos más nuevos se saturan (503 *high demand*) y hay pocas peticiones por minuto (429). La plataforma reintenta con espera, cambia al siguiente modelo de `GEMINI_FALLBACKS` (por defecto `gemini-3.7-flash, gemini-3.5-flash, gemini-3.5-flash-lite, gemini-2.5-flash`) y evita unos minutos el modelo saturado. En pantalla aparece un botón **Reintentar** y la apertura de cada sesión se reintenta sola; si el diagnóstico cerró sin planes, en *Mi diagnóstico* hay **Generar mis planes ahora**. Si aun así falla seguido, cambia `GEMINI_MODEL` a `gemini-3.5-flash` en Render → Environment (redespliega solo) o pasa al nivel de pago de AI Studio.
+
 ## 5. Operación
 
 - **Presupuesto**: al 80 % todas las pantallas avisan; al 100 % los agentes se detienen y el superadmin amplía el tope en `/admin`. El contador se reinicia cada mes.
@@ -47,7 +51,11 @@ Si prefieres crearlo a mano (sin Blueprint): *New → Web Service* → runtime P
 - **Actualizaciones**: cada push a `main` redespliega (autoDeploy). El esquema de base se migra solo al arrancar.
 - **Escalar**: si crece el uso, sube la instancia a Standard (25 USD) o el disco a 2 GB; ningún cambio de código.
 
-## 6. Verificación rápida tras desplegar
+## 6. Verificación de los agentes con IA real (antes o después de desplegar)
+
+En tu computadora, con la misma key: `pip install -r requirements.txt` y `python scripts/probar_agentes.py` (con `GEMINI_API_KEY` en el entorno). El script crea una base temporal y recorre Elena (diagnóstico con respuestas guionizadas → roadmaps), Celeste (roleplay de 7 turnos → KPIs y evidencia), Juan (diseño del escenario → ejercicio → rúbrica) y el Analista (lectura, chat con herramientas, investigación con fuentes, resumen). Imprime cada respuesta, el costo y los fallos. Si todo sale "✔", los agentes están operando correctamente con tu key.
+
+## 7. Verificación rápida tras desplegar
 
 1. `GET /salud` responde.
 2. Entrar/salir con RRHH; alta de un colaborador de prueba.

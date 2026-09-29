@@ -23,12 +23,14 @@ def admin(request: Request, u: dict = Depends(sa), ok: str = "", error: str = ""
                           "presupuesto_mxn": db.get_ajuste("presupuesto_mxn", settings.PRESUPUESTO_MXN), "tipo_cambio": db.get_ajuste("tipo_cambio", settings.TIPO_CAMBIO_MXN_USD),
                           "grounding_max_mes": db.get_ajuste("grounding_max_mes", settings.GROUNDING_MAX_MES), "proveedor": settings.LLM_PROVEEDOR,
                           "api_key": bool(settings.GEMINI_API_KEY), "precios": settings.PRICE_TABLE},
-                  presupuesto_full=db.presupuesto(), ok=ok, error=error, clave=clave, superadmins=db.usuarios(rol="superadmin", activos=None))
+                  presupuesto_full=db.presupuesto(), ok=ok, error=error, clave=clave, superadmins=db.usuarios(rol="superadmin", activos=None),
+                  rrhh_por_empresa={e["id"]: [x for x in db.usuarios(e["id"], activos=None) if x["rol"] in ("rrhh", "dg")] for e in db.empresas()},
+                  password_min=settings.PASSWORD_MIN)
 
 
 @router.post("/empresas")
 def empresa_crear(request: Request, u: dict = Depends(sa), csrf: str = Form(""), nombre: str = Form(""), industria: str = Form(""), rrhh_nombre: str = Form(""),
-                  rrhh_email: str = Form(""), ruta_dm: int = Form(0)):
+                  rrhh_email: str = Form(""), rrhh_password: str = Form(""), ruta_dm: int = Form(0)):
     verificar_csrf(request, u, csrf)
     if not nombre.strip():
         return RedirectResponse("/admin?error=Escribe+el+nombre+de+la+empresa", status_code=303)
@@ -38,9 +40,12 @@ def empresa_crear(request: Request, u: dict = Depends(sa), csrf: str = Form(""),
         return RedirectResponse("/admin?error=Ya+existe+esa+empresa", status_code=303)
     clave = ""
     if rrhh_email and "@" in rrhh_email:
-        clave = "MV-" + secrets.token_urlsafe(6)
+        propia = len(rrhh_password.strip()) >= settings.PASSWORD_MIN
+        clave = rrhh_password.strip() if propia else "MV-" + secrets.token_urlsafe(6)
         try:
-            db.crear_usuario(rrhh_email, clave, rrhh_nombre or "Recursos Humanos", "rrhh", eid, debe_cambiar=True)
+            db.crear_usuario(rrhh_email, clave, rrhh_nombre or "Recursos Humanos", "rrhh", eid, debe_cambiar=not propia)
+            if propia:
+                clave = "(la que escribiste)"
         except Exception:  # noqa: BLE001
             clave = ""
             db.log("warn", "admin", "No se pudo crear el usuario RRHH", rrhh_email, u["email"])
@@ -65,16 +70,38 @@ def empresa_editar(request: Request, eid: int, u: dict = Depends(sa), csrf: str 
 
 
 @router.post("/empresas/{eid}/rrhh")
-def empresa_rrhh(request: Request, eid: int, u: dict = Depends(sa), csrf: str = Form(""), nombre: str = Form(""), email: str = Form("")):
+def empresa_rrhh(request: Request, eid: int, u: dict = Depends(sa), csrf: str = Form(""), nombre: str = Form(""), email: str = Form(""), password: str = Form("")):
     verificar_csrf(request, u, csrf)
     if not db.empresa(eid) or "@" not in email:
         raise HTTPException(400, "Datos inválidos")
-    clave = "MV-" + secrets.token_urlsafe(6)
+    propia = len(password.strip()) >= settings.PASSWORD_MIN
+    if password.strip() and not propia:
+        return RedirectResponse(f"/admin?error=La+contraseña+debe+tener+al+menos+{settings.PASSWORD_MIN}+caracteres", status_code=303)
+    clave = password.strip() if propia else "MV-" + secrets.token_urlsafe(6)
     try:
-        db.crear_usuario(email, clave, nombre or "Recursos Humanos", "rrhh", eid, debe_cambiar=True)
+        db.crear_usuario(email, clave, nombre or "Recursos Humanos", "rrhh", eid, debe_cambiar=not propia)
     except Exception:  # noqa: BLE001
         return RedirectResponse("/admin?error=Ese+correo+ya+existe", status_code=303)
-    return RedirectResponse(f"/admin?ok=Usuario+RRHH+creado&clave={clave}", status_code=303)
+    db.log("info", "admin", f"Usuario RRHH creado: {email}", "", u["email"])
+    return RedirectResponse("/admin?ok=Usuario+RRHH+creado+con+la+contraseña+que+escribiste" if propia else f"/admin?ok=Usuario+RRHH+creado&clave={clave}", status_code=303)
+
+
+@router.post("/usuarios/{uid}/password")
+def usuario_password(request: Request, uid: int, u: dict = Depends(sa), csrf: str = Form(""), password: str = Form("")):
+    """Restablece la contraseña de un usuario RRHH/DG (o genera una temporal si se deja vacía)."""
+    verificar_csrf(request, u, csrf)
+    x = db.usuario(uid)
+    if not x or x["rol"] not in ("rrhh", "dg", "director", "colaborador"):
+        raise HTTPException(404)
+    propia = len(password.strip()) >= settings.PASSWORD_MIN
+    if password.strip() and not propia:
+        return RedirectResponse(f"/admin?error=La+contraseña+debe+tener+al+menos+{settings.PASSWORD_MIN}+caracteres", status_code=303)
+    clave = password.strip() if propia else "MV-" + secrets.token_urlsafe(6)
+    db.cambiar_password(uid, clave)
+    with db.conn() as con:
+        con.execute("UPDATE usuarios SET debe_cambiar_password=?, activo=1 WHERE id=?", (0 if propia else 1, uid))
+    db.log("info", "admin", f"Contraseña restablecida: {x['email']}", "", u["email"])
+    return RedirectResponse("/admin?ok=Contraseña+actualizada" if propia else f"/admin?ok=Contraseña+temporal+generada&clave={clave}", status_code=303)
 
 
 @router.post("/config")

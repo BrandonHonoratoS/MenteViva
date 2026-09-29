@@ -63,19 +63,23 @@ def area_editar(request: Request, aid: int, u: dict = Depends(rrhh), csrf: str =
 
 @router.post("/gestion/usuarios")
 def usuario_crear(request: Request, u: dict = Depends(rrhh), csrf: str = Form(""), nombre: str = Form(""), email: str = Form(""), puesto: str = Form(""),
-                  rol: str = Form("colaborador"), area_id: int = Form(0)):
+                  rol: str = Form("colaborador"), area_id: int = Form(0), password: str = Form("")):
     verificar_csrf(request, u, csrf)
     if rol not in ("colaborador", "director", "rrhh", "dg") or "@" not in email or not nombre.strip():
         return RedirectResponse("/gestion?error=Revisa+nombre,+correo+y+rol", status_code=303)
-    clave = "MV-" + secrets.token_urlsafe(6)
+    from ..config import settings
+    propia = len(password.strip()) >= settings.PASSWORD_MIN
+    if password.strip() and not propia:
+        return RedirectResponse(f"/gestion?error=La+contraseña+debe+tener+al+menos+{settings.PASSWORD_MIN}+caracteres", status_code=303)
+    clave = password.strip() if propia else "MV-" + secrets.token_urlsafe(6)
     try:
-        uid = db.crear_usuario(email, clave, nombre, rol, u["empresa_id"], area_id or None, puesto.strip()[:80], debe_cambiar=True)
+        uid = db.crear_usuario(email, clave, nombre, rol, u["empresa_id"], area_id or None, puesto.strip()[:80], debe_cambiar=not propia)
     except Exception:  # noqa: BLE001 — correo duplicado
         return RedirectResponse("/gestion?error=Ese+correo+ya+está+registrado", status_code=303)
     if rol == "director" and area_id:
         db.actualizar_area(area_id, director_id=uid)
     db.log("info", "gestion", f"Usuario creado: {email} ({rol})", "", u["email"])
-    return RedirectResponse(f"/gestion?ok=Usuario+creado&clave={clave}", status_code=303)
+    return RedirectResponse("/gestion?ok=Usuario+creado+con+la+contraseña+que+escribiste" if propia else f"/gestion?ok=Usuario+creado&clave={clave}", status_code=303)
 
 
 @router.post("/gestion/usuarios/{uid}")

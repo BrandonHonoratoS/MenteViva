@@ -19,6 +19,7 @@ from ..llm.gemini import ErrorLLM
 from . import catalogo as C
 from . import esquemas as E
 from . import prompts as P
+from . import validar as V
 from .avatares import AVATARES, Juan, agente_para, json_compacto, transcript_texto
 
 log = logging.getLogger("mv.motor")
@@ -61,27 +62,58 @@ def iniciar(usuario: dict, habilidad_id: str, item: dict | None = None, nivel: s
 
     sid = db.crear_sesion(usuario["id"], habilidad_id, agente.id, tipo=tipo, roadmap_item_id=(item or {}).get("id"), nivel=nivel,
                           competencia=competencia, objetivo=objetivo, escenario=escenario, voluntaria=voluntaria)
-    sesion = db.sesion(sid)
+    db.log("info", "sesion", f"Sesión {sid} iniciada", f"{habilidad_id} · {nivel} · {competencia or '-'}", usuario["email"])
     try:
-        if agente is Juan:
-            historial = _historial_competencia(usuario["id"], competencia)
+        continuar(db.sesion(sid), usuario)
+    except (PresupuestoAgotado, ErrorLLM) as e:
+        # La sesión queda abierta sin apertura: la pantalla la pedirá de nuevo (botón Reintentar / reintento automático).
+        db.log("warn", "sesion", f"Sesión {sid}: apertura pendiente", str(e), usuario["email"])
+        if isinstance(e, PresupuestoAgotado):
+            db.actualizar_sesion(sid, estado="error", error=str(e), fin=db.now())
+            raise
+    return db.sesion(sid)
+
+
+def continuar(sesion: dict, usuario: dict) -> dict | None:
+    """Genera lo que falte para que la conversación avance: el diseño (Juan), la apertura o la respuesta a un mensaje del usuario
+    que quedó sin contestar por un fallo de la IA. Idempotente: si no falta nada, no llama al modelo."""
+    lk = _lock(sesion["id"])
+    if not lk.acquire(blocking=False):
+        raise SesionOcupada("El avatar todavía está respondiendo.")
+    try:
+        sesion = db.sesion(sesion["id"])
+        if sesion["estado"] != "en_curso":
+            raise SesionOcupada("La sesión ya terminó.")
+        agente = agente_para(sesion["habilidad"])
+        perfil = db.perfil(usuario["id"])
+        escenario = dict(sesion.get("escenario") or {})
+        if agente is Juan and not escenario.get("titulo"):
+            historial = _historial_competencia(usuario["id"], sesion.get("competencia") or "")
             prompt, schema = Juan.prompt_diseno(sesion, usuario, perfil, historial)
             r = llm.generar(origen="juan.diseno", system=prompt, contents=[{"role": "user", "text": "Diseña la sesión."}], schema=schema,
-                            thinking=settings.GEMINI_THINKING_ANALISIS, max_tokens=1500, usuario_id=usuario["id"], sesion_id=sid, temperatura=0.8)
-            dis = r.json or {}
-            escenario.update({k: dis.get(k) for k in ("formato", "titulo", "encuadre", "personaje", "situacion", "primer_mensaje", "subdimensiones", "dificultad_inicial")})
-            db.actualizar_sesion(sid, escenario_json=escenario, formato=dis.get("formato", ""))
-            sesion = db.sesion(sid)
-        texto_fijo, pista = agente.apertura(sesion)
-        if texto_fijo:
-            db.guardar_mensaje(sid, "avatar", texto_fijo, {"tension": (escenario.get("dificultad_inicial") or 2) * 15, "estado": "en_curso"})
-        else:
-            _generar_turno(sesion, usuario, perfil, pista, origen_extra="apertura")
-    except (PresupuestoAgotado, ErrorLLM) as e:
-        db.actualizar_sesion(sid, estado="error", error=str(e), fin=db.now())
-        raise
-    db.log("info", "sesion", f"Sesión {sid} iniciada", f"{habilidad_id} · {nivel} · {competencia or '-'}", usuario["email"])
-    return db.sesion(sid)
+                            thinking=settings.GEMINI_THINKING_ANALISIS, max_tokens=3000, usuario_id=usuario["id"], sesion_id=sesion["id"], temperatura=0.8)
+            V.registrar_si_incompleto("juan.diseno", r.json, usuario.get("email", ""))
+            dis = V.diseno_juan(r.json, sesion)
+            escenario.update(dis)
+            db.actualizar_sesion(sesion["id"], escenario_json=escenario, formato=dis["formato"])
+            sesion = db.sesion(sesion["id"])
+        mensajes = [m for m in db.mensajes(sesion["id"]) if m["rol"] in ("usuario", "avatar")]
+        if not mensajes:
+            texto_fijo, pista = agente.apertura(sesion)
+            if texto_fijo:
+                meta = {"tension": (escenario.get("dificultad_inicial") or 2) * 15, "estado": "en_curso"}
+                db.guardar_mensaje(sesion["id"], "avatar", texto_fijo, meta)
+                return {"texto": texto_fijo, **meta}
+            return _generar_turno(sesion, usuario, perfil, pista, origen_extra="apertura")
+        if mensajes[-1]["rol"] == "usuario":
+            resp = _generar_turno(sesion, usuario, perfil)
+            if mensajes[-1]["texto"].lower().strip(" .!¡¿?") in ("fin", "terminar", "adiós", "adios", "ya"):
+                resp["estado"] = "fin"
+            return resp
+        ultimo = mensajes[-1]
+        return {"texto": ultimo["texto"], **(ultimo.get("meta") or {})}
+    finally:
+        lk.release()
 
 
 def _historial_competencia(usuario_id: int, competencia: str) -> list[dict]:
@@ -120,9 +152,12 @@ def _generar_turno(sesion: dict, usuario: dict, perfil: dict, pista: str | None 
     if restantes <= 2 and not pista:
         contents[-1]["text"] += f"\n[sistema: quedan {max(restantes, 0)} turnos de práctica. Si no hay cierre, termina la sesión en este turno de forma natural y marca estado fin.]"
     r = llm.generar(origen=f"{agente.id}.{origen_extra}", system=agente.system(sesion, usuario, perfil), contents=contents, schema=agente.schema_para(sesion),
-                    max_tokens=400, temperatura=0.85, usuario_id=usuario["id"], sesion_id=sesion["id"])
-    js = r.json if isinstance(r.json, dict) else {}
-    texto = (js.get("mensaje") or r.texto or "…").strip()
+                    max_tokens=1200, temperatura=0.85, usuario_id=usuario["id"], sesion_id=sesion["id"])
+    V.registrar_si_incompleto(f"{agente.id}.{origen_extra}", r.json, usuario.get("email", ""))
+    js = V.turno(r.json, r.texto)
+    texto = js["mensaje"]
+    if not texto:
+        raise ErrorLLM("La IA devolvió una respuesta vacía o incompleta. Pulsa Reintentar.")
     meta = {k: v for k, v in js.items() if k != "mensaje"}
     if "fase" in meta and meta["fase"] == "fin":
         meta["estado"] = "fin"
@@ -179,7 +214,7 @@ def _quiza_resumir(sesion: dict, usuario: dict) -> None:
     texto = ("Memoria previa: " + previo + "\n" if previo else "") + "\n".join(f"{m['rol']}: {m['texto']}" for m in antiguos)
     try:
         r = llm.generar(origen="motor.resumen", system=P.RESUMEN_CONVERSACION, contents=[{"role": "user", "text": texto[-6000:]}], schema=E.RESUMEN,
-                        clase="ligero", thinking="off", max_tokens=250, temperatura=0.2, usuario_id=usuario["id"], sesion_id=sesion["id"])
+                        clase="ligero", thinking="off", max_tokens=800, temperatura=0.2, usuario_id=usuario["id"], sesion_id=sesion["id"])
         memoria = (r.json or {}).get("memoria") or r.texto
         db.actualizar_sesion(sesion["id"], resumen_json={"memoria": memoria[:1200], "hasta_mensaje": antiguos[-1]["id"]})
     except (PresupuestoAgotado, ErrorLLM):
@@ -221,10 +256,10 @@ def analizar(sesion_id: int) -> None:
             return
         prompt, schema = agente.prompt_feedback(sesion)
         r = llm.generar(origen=f"{agente.id}.feedback", system=prompt, contents=[{"role": "user", "text": "TRANSCRIPCIÓN:\n" + transcript}], schema=schema,
-                        thinking=settings.GEMINI_THINKING_ANALISIS, max_tokens=4000, temperatura=0.3, usuario_id=usuario["id"], sesion_id=sesion_id)
-        resultado = r.json if isinstance(r.json, dict) else None
-        if not resultado:
-            raise ErrorLLM("El análisis no devolvió un resultado válido.")
+                        thinking=settings.GEMINI_THINKING_ANALISIS, max_tokens=8000, temperatura=0.3, usuario_id=usuario["id"], sesion_id=sesion_id)
+        if not isinstance(r.json, dict):
+            raise ErrorLLM("El análisis no devolvió un resultado válido. Pulsa Reintentar análisis.")
+        resultado = {"elena": V.feedback_entrevistas, "celeste": V.feedback_ventas, "juan": V.feedback_dm}[agente.id](r.json, sesion)
         score = agente.score(resultado, sesion)
         resultado["score_global_100"] = score
         resultado["turnos"] = sesion["turnos"]

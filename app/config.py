@@ -31,7 +31,7 @@ def _f(key: str, default: float) -> float:
 class Settings:
     APP_NAME = "Mente Viva"
     TAGLINE = "Crece desde adentro, impacta hacia afuera"
-    VERSION = "1.0.0"
+    VERSION = "1.0.3"
 
     def __init__(self) -> None:
         self.APP_ENV = os.getenv("APP_ENV", "development")
@@ -73,6 +73,8 @@ class Settings:
         self.GEMINI_THINKING_AVATAR = os.getenv("GEMINI_THINKING_AVATAR", "low")     # low|medium|high
         self.GEMINI_THINKING_ANALISIS = os.getenv("GEMINI_THINKING_ANALISIS", "medium")
         self.GEMINI_TIMEOUT = _i("GEMINI_TIMEOUT", 90)
+        # Modelos de respaldo si el principal está saturado (503/429): se prueban en orden
+        self.GEMINI_FALLBACKS = [m.strip() for m in os.getenv("GEMINI_FALLBACKS", "gemini-3.7-flash,gemini-3.5-flash,gemini-3.5-flash-lite,gemini-2.5-flash").split(",") if m.strip()]
         self.GROUNDING_MAX_MES = _i("GROUNDING_MAX_MES", 40)   # llamadas con búsqueda de Google al mes (tienen costo aparte)
 
         # ── Presupuesto de IA (tope duro) ───────────────────────────────────

@@ -15,6 +15,7 @@ from ..llm.gemini import ErrorLLM
 from . import catalogo as C
 from . import esquemas as E
 from . import prompts as P
+from . import validar as V
 from .avatares import _texto_perfil, json_compacto
 
 
@@ -27,10 +28,10 @@ def analizar_diagnostico(sesion: dict, usuario: dict, transcript: str) -> None:
                                      nivel_dm_estimado=C.nivel_dm_estimado(ob), habilidades=", ".join(h["id"] for h in habs), reglas=P.REGLAS_FEEDBACK)
     contenido = "PERFIL DECLARADO:\n" + _texto_perfil(usuario, ob) + "\n\nTRANSCRIPCIÓN:\n" + transcript
     r = llm.generar(origen="elena.analisis", system=prompt, contents=[{"role": "user", "text": contenido}], schema=E.ELENA_DIAGNOSTICO,
-                    thinking=settings.GEMINI_THINKING_ANALISIS, max_tokens=4000, temperatura=0.3, usuario_id=usuario["id"], sesion_id=sesion["id"])
-    diag = r.json if isinstance(r.json, dict) else None
-    if not diag:
-        raise ErrorLLM("El diagnóstico no devolvió un resultado válido.")
+                    thinking=settings.GEMINI_THINKING_ANALISIS, max_tokens=8000, temperatura=0.3, usuario_id=usuario["id"], sesion_id=sesion["id"])
+    if not isinstance(r.json, dict):
+        raise ErrorLLM("El diagnóstico no devolvió un resultado válido. Pulsa Reintentar análisis.")
+    diag = V.diagnostico(r.json, ob)
     diag["fecha"] = db.now()
     comp_validas = [c for c in diag.get("competencias", []) if int(c.get("nivel", 0)) > 0]
     diag["score_inicial"] = round(sum(int(c["nivel"]) for c in comp_validas) / (5 * len(comp_validas)) * 100, 1) if comp_validas else None
@@ -67,6 +68,36 @@ def analizar_diagnostico(sesion: dict, usuario: dict, transcript: str) -> None:
         db.notificar(m["id"], f"Diagnóstico completado: {usuario['nombre']}",
                      f"Nivel ventas {diag.get('nivel_ventas')} · Ruta DM {diag.get('nivel_dm')} · {len(creados)} roadmaps", f"/colaborador/{usuario['id']}")
     db.log("info", "roadmap", f"Diagnóstico y {len(creados)} roadmaps para {usuario['email']}", ", ".join(h for h, _ in creados))
+
+
+def generar_roadmaps_faltantes(usuario: dict) -> list[str]:
+    """Vuelve a crear los roadmaps que no se generaron (p. ej. por un fallo transitorio de la IA tras el diagnóstico)."""
+    perfil = db.perfil(usuario["id"])
+    diag = perfil.get("diagnostico") or {}
+    if perfil.get("estado") != "completo" or not diag:
+        return []
+    ob = perfil.get("onboarding", {})
+    ids = {h["id"] for h in C.habilidades_empresa(db.empresa(usuario.get("empresa_id")))}
+    prioridades = [p for p in diag.get("prioridades", []) if p.get("habilidad_id") in ids]
+    orden = [p["habilidad_id"] for p in prioridades]
+    if "ruta_dm" in ids and "ruta_dm" not in orden:
+        orden.append("ruta_dm")
+    existentes = {r["habilidad"] for r in db.roadmaps(usuario["id"], ("activo", "propuesto"))}
+    usa = C.habilidades_que_usa(ob)
+    spw_total = C.sesiones_por_semana(ob.get("tiempo_semana", ""))
+    creados = []
+    for i, hid in enumerate(orden):
+        if hid in existentes:
+            continue
+        if not db.nivel(usuario["id"], hid):
+            nivel = {"ventas": diag.get("nivel_ventas") or C.nivel_ventas_estimado(ob), "entrevistas": diag.get("nivel_entrevistas") or "Principiante",
+                     "ruta_dm": diag.get("nivel_dm") or C.nivel_dm_estimado(ob)}[hid]
+            db.guardar_nivel(usuario["id"], hid, nivel, diag.get("score_inicial") if hid != "ruta_dm" else None, "diagnóstico de Elena")
+        brecha = next((p.get("brecha") for p in prioridades if p["habilidad_id"] == hid), "media")
+        spw = max(1, spw_total // max(1, len(orden)) + (1 if i < spw_total % max(1, len(orden)) else 0))
+        generar_roadmap(usuario, hid, brecha=brecha, sesiones_semana=spw, requiere_aprobacion=hid not in usa, diagnostico=diag)
+        creados.append(hid)
+    return creados
 
 
 def _managers_de(usuario: dict) -> list[dict]:
@@ -125,7 +156,7 @@ def generar_roadmap(usuario: dict, habilidad_id: str, brecha: str = "media", ses
               "Los objetivos deben progresar: primero fundamentos, luego presión, luego integración; el 60 % del plan de ventas ataca la etapa débil declarada; "
               "respeta las metas del líder. Escribe también el objetivo del plan (una línea) y 'por qué este orden' (2–3 líneas). Español de México. Responde SOLO con JSON.")
     r = llm.generar(origen="elena.roadmap", system=system, contents=[{"role": "user", "text": json_compacto(contexto)}], schema=E.ROADMAP,
-                    thinking="low", max_tokens=2500, temperatura=0.5, usuario_id=usuario["id"])
+                    thinking="low", max_tokens=5000, temperatura=0.5, usuario_id=usuario["id"])
     js = r.json if isinstance(r.json, dict) else {}
     items_ia = js.get("items") or []
     items = []

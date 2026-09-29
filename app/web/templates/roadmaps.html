@@ -2,7 +2,8 @@
 {% block subtitulo %}Roadmaps diseñados por Elena y recalculados por el Analista después de cada sesión{% endblock %}
 {% block content %}
 {% if perfil.estado != 'completo' %}<div class="card hero"><h2>Primero tu diagnóstico</h2><p class="muted">Elena diseña tus planes al terminar la entrevista.</p><a class="btn primary mt" href="/diagnostico">Ir al diagnóstico</a></div>
-{% elif not roadmaps %}<div class="empty">Aún no hay planes.</div>{% endif %}
+{% elif not roadmaps %}<div class="card hero"><h2>Aún no hay planes</h2><p class="muted">Si Elena ya te diagnosticó, genera tus planes aquí (la IA pudo estar saturada al cerrar la entrevista).</p>
+<form method="post" action="/diagnostico/planes"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn primary mt" type="submit">Generar mis planes ahora</button></form></div>{% endif %}
 {% for r in roadmaps %}
 {% set hab = HABILIDADES[r.habilidad] %}{% set av = AVATARES[hab.agente] %}
 <div class="card mb" style="margin-bottom:18px">
