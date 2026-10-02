@@ -1,0 +1,31 @@
+{% extends "base.html" %}{% block title %}Laboratorio DM{% endblock %}
+{% block subtitulo %}Laboratorio Interactivo de Habilidades para Delivery Managers · con Juan Artiaga como evaluador{% endblock %}
+{% block content %}
+<div class="grid g-1-2">
+  <div class="card hero">
+    <div class="orb-wrap"><div class="orb" style="--c1:{{ avatar.color }};--c2:#06B6D4"></div><b>{{ avatar.nombre }}</b><span class="muted small">Evaluador experto de competencias aplicadas</span></div>
+    <p class="muted mt">Dos situaciones profesionales reales de proyecto: una entrega bajo presión y un incidente en producción. Juan presenta la escena, reacciona como los personajes y libera nueva información según lo que decidas. No enseña ni evalúa en voz alta: el reporte llega al final.</p>
+    <div class="row mt"><span class="chip">~{{ lab.DURACION_MIN }} min</span><span class="chip aqua">{{ lab.total_eventos(lab.CASOS_FIJOS) }} momentos de decisión</span>{% if item %}<span class="chip mint">del plan · semana {{ item.semana }}</span>{% else %}<span class="chip amber">{{ 'checkpoint voluntario' if previos else 'primer laboratorio' }}</span>{% endif %}</div>
+    <div class="cap mt-l">Cómo te evalúa Juan (100 puntos)</div>
+    {% for d in lab.DIMENSIONES %}<div class="row between small" style="flex-wrap:nowrap;gap:10px"><span>{{ d.nombre }}</span><b style="flex:none">{{ d.puntos }} pts</b></div>{% endfor %}
+    <p class="small muted mt">Evalúa lo que haces, no lo que dices que sabes: no necesitas mencionar metodologías. Escala: 90–100 sobresaliente · 80–89 sólido · 70–79 funcional · 60–69 en desarrollo · &lt;60 requiere fortalecimiento.</p>
+    {% if ultimo %}<div class="alert info mt"><b>Tu último laboratorio:</b> {{ ultimo.total|round(0)|int }}/100 · {{ ultimo.nivel }} · prioridad: {{ ultimo.prioridad.nombre }}. Hoy Juan usará casos nuevos.</div>{% endif %}
+  </div>
+  <div class="card">
+    <form method="post" action="/laboratorio/iniciar">
+      <input type="hidden" name="csrf" value="{{ csrf }}">{% if item %}<input type="hidden" name="item" value="{{ item.id }}">{% endif %}
+      <div class="cap">Antes de entrar</div>
+      <h2 style="font-size:1.4rem">{{ item.objetivo if item else ('Checkpoint: mide tu avance con casos nuevos' if previos else 'Tu punto de partida en la Ruta DM') }}</h2>
+      <ul class="list mt">
+        <li><span class="n">1</span><div class="small">Responde <b>como actuarías realmente</b>: qué harías, qué dirías o ambas. Una respuesta breve puede demostrar alta competencia.</div></li>
+        <li><span class="n">2</span><div class="small">No hay opción múltiple ni respuestas correctas únicas. Las situaciones evolucionan con tus decisiones: lo que prometas, el cliente lo usará después.</div></li>
+        <li><span class="n">3</span><div class="small">Juan no da pistas ni retroalimentación durante los casos. Si preguntas “¿voy bien?”, te recordará que el reporte llega al final.</div></li>
+        <li><span class="n">4</span><div class="small">Al terminar: puntaje por dimensión, radar cualitativo, 3 fortalezas, 3 oportunidades, momentos clave, recomendaciones y tu prioridad de desarrollo, que reordena tu plan.</div></li>
+      </ul>
+      <div class="alert info mb mt">Reserva {{ lab.DURACION_MIN }} minutos sin interrupciones. Puedes escribir <b>Fin</b> para cerrar antes; el reporte se genera con lo respondido.</div>
+      <button class="btn primary lg block" type="submit">Comenzar el laboratorio</button>
+      {% if previos %}<div class="cap mt">Laboratorios anteriores</div>{% for p in previos %}<div class="row between small"><span>{{ p.inicio|fecha_corta }} · {{ (p.resultado.laboratorio or {}).nivel }}</span><a class="btn sm" href="/sesion/{{ p.id }}/reporte">{{ p.score_global|round(0)|int }}/100 · ver</a></div>{% endfor %}{% endif %}
+    </form>
+  </div>
+</div>
+{% endblock %}

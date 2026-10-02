@@ -23,7 +23,13 @@ log = logging.getLogger("mv")
 async def _vida(app: FastAPI):
     db.init_db()
     scheduler.iniciar()
-    log.info("%s v%s lista · LLM=%s · datos=%s", settings.APP_NAME, settings.VERSION, settings.LLM_PROVEEDOR, settings.DB_PATH)
+    est = db.estado_datos()
+    log.info("%s v%s lista · LLM=%s · datos=%s · %s empresas · %s usuarios activos · %s sesiones · disco %s", settings.APP_NAME, settings.VERSION,
+             settings.LLM_PROVEEDOR, settings.DB_PATH, est["conteos"]["empresas"], est["usuarios_activos"], est["conteos"]["sesiones"],
+             "persistente" if est["persistente"] else "TEMPORAL")
+    if settings.APP_ENV == "production" and not est["persistente"]:
+        log.warning("DATA_DIR=%s no es un disco persistente: la base se perderá en cada deploy. Monta un disco en /data y define DATA_DIR=/data.", settings.DATA_DIR)
+        db.log("warn", "sistema", "La base NO está en disco persistente", f"DATA_DIR={settings.DATA_DIR}; se perderá en cada deploy")
     yield
 
 

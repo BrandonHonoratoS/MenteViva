@@ -19,6 +19,14 @@
         <div class="field"><label>Máximo de búsquedas web al mes</label><input name="grounding_max_mes" type="number" value="{{ config.grounding_max_mes }}"></div>
         <button class="btn primary" type="submit">Guardar</button></form>
       <details class="mt"><summary>Tarifas registradas (USD por millón de tokens)</summary><table class="mt">{% for mdl, p in config.precios.items() %}<tr><td class="mono small">{{ mdl }}</td><td class="tright">{{ p[0] }} / {{ p[1] }}</td></tr>{% endfor %}</table><p class="muted tiny">Se sobreescriben con la variable PRICE_TABLE. Verifica en ai.google.dev/gemini-api/docs/pricing.</p></details></div>
+    <div class="card"><h2>Datos y respaldo</h2>
+      <div class="row between small"><span class="muted">Base de datos</span><span class="mono tiny">{{ datos.ruta }}</span></div>
+      <div class="row between small"><span class="muted">Disco</span>{% if datos.persistente %}<span class="chip mint">persistente · sobrevive deploys y reinicios</span>{% else %}<span class="chip rose">temporal · se pierde en cada deploy (configura un disco en /data y DATA_DIR=/data)</span>{% endif %}</div>
+      <div class="row between small"><span class="muted">Registros</span><span>{{ datos.conteos.empresas }} empresas · {{ datos.usuarios_activos }} usuarios activos · {{ datos.conteos.sesiones }} sesiones · {{ datos.conteos.roadmaps }} planes · {{ datos.conteos.analisis }} análisis</span></div>
+      <div class="row between small"><span class="muted">Tamaño · última escritura</span><span>{{ datos.tamano_kb }} KB · {{ datos.modificada|fecha if datos.modificada else '—' }}</span></div>
+      <div class="row between small"><span class="muted">Versión en ejecución</span><span class="chip">v{{ datos.version }}</span></div>
+      <a class="btn sm mt" href="/admin/respaldo.db">⬇ Descargar respaldo (.db)</a>
+      <p class="muted tiny mt">Las actualizaciones de la plataforma nunca borran datos: el esquema se crea sólo si no existe y el superadmin/empresa inicial sólo si la base está vacía. Descarga un respaldo antes de cada deploy por tranquilidad; para restaurar, copia el archivo a DATA_DIR/mente_viva.db con el servicio detenido.</p></div>
     <div class="card"><h2>Superadministradores</h2>{% for s in superadmins %}<div class="row between small"><span>{{ s.nombre }} <span class="muted">{{ s.email }}</span></span><span class="chip {{ 'mint' if s.activo else 'gris' }}">{{ 'activo' if s.activo else 'inactivo' }}</span></div>{% endfor %}
       <form method="post" action="/admin/superadmins" class="inline-form mt"><input type="hidden" name="csrf" value="{{ csrf }}"><div class="field"><input name="nombre" placeholder="Nombre"></div><div class="field"><input name="email" type="email" placeholder="correo@menteviva.mx" required></div><button class="btn sm" type="submit">Agregar</button></form></div>
   </div>

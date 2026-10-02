@@ -72,6 +72,7 @@
       if (m.fase) { const k = fases.indexOf(m.fase); $$('#fases span').forEach((s, j) => s.classList.toggle('on', j <= k)); $('#fase-v').textContent = m.fase; }
       if (m.etapa) $('#etapa-v').textContent = m.etapa;
       if (m.historias != null) $('#hist-v').textContent = m.historias;
+      if (m.lab && $('#lab-caso')) { $('#lab-caso').textContent = m.lab.caso + ' / ' + m.lab.casos; $('#lab-evento').textContent = m.lab.evento + ' / ' + m.lab.eventos; $('#lab-bar i').style.width = Math.round((m.lab.respondidos / (m.lab.total || 10)) * 100) + '%'; if (m.lab.titulo) $('#lab-titulo').textContent = m.lab.titulo; }
     }
     setInterval(() => { if (fin) return; const s = Math.max(0, Math.floor((Date.now() - inicio) / 1000)); const m = Math.floor(s / 60); $('#timer').textContent = m + ':' + String(s % 60).padStart(2, '0'); $('#timer').classList.toggle('down', m >= dur); }, 1000);
     let pendiente = false;   // hay un mensaje del usuario (o la apertura) sin respuesta del avatar
@@ -102,6 +103,7 @@
       const texto = (txt ?? ta.value).trim(); if (!texto || fin) return;
       if (pendiente) { continuar(); return; }
       ta.value = ''; btn.disabled = true; add('usuario', texto); typing(true); pendiente = true;
+      $$('[data-rapido^="Estoy listo"]').forEach(b => b.remove());
       try {
         const r = await api('/api/sesiones/' + id + '/mensaje', { texto });
         typing(false); aplicar(r);

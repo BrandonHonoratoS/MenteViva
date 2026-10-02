@@ -141,9 +141,44 @@ if ses:
     else:
         FALLOS.append(("celeste", s.get("error") or s["estado"]))
 
-# ── 3. Juan Artiaga ──────────────────────────────────────────────────────────
-print("\n3) JUAN ARTIAGA · Ruta DM")
+# ── 3. Juan Artiaga · Laboratorio DM ─────────────────────────────────────────
+print("\n3) JUAN ARTIAGA · Laboratorio Interactivo de Habilidades para DM")
 item = db.siguiente_item(uid, "ruta_dm")
+lab = paso("bienvenida (texto fijo)", lambda: motor.iniciar(u, "ruta_dm", item=item if item and item.get("tipo") == "laboratorio" else None, tipo="laboratorio"))
+if lab:
+    paso("confirmación → Caso 1 · Evento 1 (texto fijo)", lambda: hablar(lab, u, ["Estoy listo, comencemos."]))
+    print("     JUAN:", db.mensajes(lab["id"])[-1]["texto"][:200].replace("\n", " "))
+    respuestas = [
+        "Antes de comprometer una fecha quiero entender qué falta. QA, ¿qué flujos quedan sin validar y cuánto tiempo toman? Líder técnico, ¿qué es exactamente 'unas cosas por revisar'?",
+        "Entiendo la presión y la necesidad de una respuesta clara. Hoy no puedo decir sí con honestidad: a las 4 pm, con el estado de pruebas en la mano, le digo si es viernes o qué alternativa realista hay.",
+        "Gracias por decirlo ahora. Nadie busca culpables; necesitamos reproducirla hoy. ¿Qué operaciones la disparan y cuántos registros afectó? Asigno a dos personas a reproducirla y a QA a validar el flujo afectado; nos vemos a las 3.",
+        "Los tres cambios entran como control de cambios: los estimamos hoy con impacto en pruebas y fecha. Si caben sin afectar la liberación, entran; si no, van en la siguiente ventana con fecha comprometida.",
+        "Hay una falla intermitente que puede duplicar información; impacta la confiabilidad de la salida del viernes. Estamos reproduciéndola hoy con dos personas y QA valida el flujo. A las 4 pm le confirmo si salimos el viernes o proponemos lunes con pruebas completas. Siguiente paso: checkpoint hoy a las 4.",
+        "Primero estabilizar, después causas. DBA, ¿qué muestran los procesos? Middleware, comparen con la ventana previa. Dev, documenta exactamente qué cambió. Nadie busca responsables ahora; en 15 minutos les doy estatus y una decisión sobre revertir.",
+        "La coincidencia en tiempo no prueba la causa, pero tampoco la descarta. Tenemos CPU al 95 % y procesos que ya crecían. Seguimos dos líneas en paralelo: revertir en ambiente de prueba para ver si baja la carga, y el DBA analiza los procesos. En 20 minutos sabemos más.",
+        "Gracias por avisar; llevas once horas y necesitamos decisiones de calidad. Deja documentado el cambio y te relevo con Ana para la revisión de código; mañana retomas. Yo coordino la llamada.",
+        "Qué pasó: lentitud severa desde las 6 pm tras un despliegue; la causa aún no está confirmada. Qué hacemos: revertir en prueba y analizar la base en paralelo; usuarios con operación limitada. Siguiente actualización: 7:30 pm por este canal.",
+        "Antes de cerrar: evidencia de estabilidad por 2 horas con monitoreo, documentar la línea de tiempo y las acciones, análisis de causa raíz con responsable y fecha, acciones preventivas y comunicación de cierre al cliente.",
+    ]
+    paso("10 eventos (reacciones de Juan + guion fijo)", lambda: hablar(lab, u, respuestas))
+    s = db.sesion(lab["id"])
+    if s["estado"] == "completada":
+        L = s["resultado"]["laboratorio"]
+        print(f"     Resultado {L['total']}/100 · {L['nivel']} · " + " · ".join(f"{d['corto']} {d['puntos']}/{d['maximo']} ({d['radar']})" for d in L["dimensiones"]))
+        print("     Fortalezas:", "; ".join(f["nombre"] for f in L["fortalezas"]))
+        print("     Oportunidades:", "; ".join(o["nombre"] for o in L["oportunidades"]))
+        print("     Prioridad:", L["prioridad"]["nombre"], "→", "; ".join(L["prioridad"]["que_practicar"]))
+        rm = db.roadmap_activo(uid, "ruta_dm")
+        sig = next((it for it in (rm or {}).get("items", []) if it["estado"] == "pendiente"), None)
+        print("     Siguiente sesión del plan:", (sig or {}).get("competencia"), "·", (sig or {}).get("objetivo", "")[:90])
+    else:
+        FALLOS.append(("laboratorio", s.get("error") or s["estado"]))
+
+# ── 3b. Juan Artiaga · sesión de competencia ─────────────────────────────────
+print("\n3b) JUAN ARTIAGA · Ruta DM (sesión de competencia)")
+item = db.siguiente_item(uid, "ruta_dm")
+if item and item.get("tipo") == "laboratorio":
+    item = None
 ses = paso("diseño + apertura", lambda: motor.iniciar(u, "ruta_dm", item=item, nivel=None if item else "DM1", voluntaria=item is None))
 if ses:
     e = ses["escenario"]

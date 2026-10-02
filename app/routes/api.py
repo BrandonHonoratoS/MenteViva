@@ -48,7 +48,7 @@ async def mensaje(sid: int, request: Request, u: dict = Depends(requiere_usuario
     if fin:
         motor.terminar(s, db.usuario(u["id"]), en_hilo=not settings.ANALISIS_SINCRONO)
     return {"mensaje": r.get("texto"), "meta": {k: v for k, v in r.items() if k != "texto"}, "turnos": s["turnos"],
-            "turnos_max": C.turnos_max(s["habilidad"], s.get("nivel")), "fin": fin}
+            "turnos_max": C.turnos_max_sesion(s), "fin": fin}
 
 
 @router.post("/sesiones/{sid}/continuar")
@@ -71,7 +71,7 @@ async def continuar(sid: int, request: Request, u: dict = Depends(requiere_usuar
         motor.terminar(s, db.usuario(u["id"]), en_hilo=not settings.ANALISIS_SINCRONO)
     mensajes = db.mensajes(sid)
     return {"mensaje": (r or {}).get("texto"), "meta": {k: v for k, v in (r or {}).items() if k != "texto"}, "turnos": s["turnos"],
-            "turnos_max": C.turnos_max(s["habilidad"], s.get("nivel")), "fin": fin, "n_mensajes": len([m for m in mensajes if m["rol"] in ("usuario", "avatar")]),
+            "turnos_max": C.turnos_max_sesion(s), "fin": fin, "n_mensajes": len([m for m in mensajes if m["rol"] in ("usuario", "avatar")]),
             "escenario": {k: (s.get("escenario") or {}).get(k) for k in ("titulo", "encuadre", "situacion", "formato", "personaje")}}
 
 

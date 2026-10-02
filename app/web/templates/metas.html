@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% block title %}Metas{% endblock %}
 {% block subtitulo %}El Analista integra estas metas al recalcular roadmaps y al escribir sus lecturas{% endblock %}
 {% block content %}
-{% if ok %}<div class="alert ok mb">Meta creada.</div>{% endif %}
+{% if ok %}<div class="alert ok mb">Meta creada. El Analista está recalibrando los planes activos afectados; verás un aviso cuando termine.</div>{% endif %}
 <div class="grid g-1-2">
   <div class="card"><h2>Nueva meta</h2>
     <form method="post" action="/metas"><input type="hidden" name="csrf" value="{{ csrf }}">

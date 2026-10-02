@@ -178,6 +178,7 @@ tr.link{cursor:pointer}tr.link:hover td{background:var(--surface-2)}
 .tl-item::before{content:"";position:absolute;left:-22px;top:16px;width:12px;height:12px;border-radius:50%;background:#fff;border:3px solid var(--violet-2)}
 .tl-item.done::before{background:var(--mint);border-color:var(--mint)}
 .tl-item.refuerzo::before{border-color:var(--amber)}
+.tl-item.lab::before{border-color:#10B981;background:#10B981}
 .tl-item.next{border-color:var(--violet-2);box-shadow:0 0 0 4px rgba(168,85,247,.12)}
 .kpi-row{display:grid;grid-template-columns:150px 1fr 60px;gap:12px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line)}
 .kpi-row:last-child{border-bottom:0}

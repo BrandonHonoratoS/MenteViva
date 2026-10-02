@@ -46,6 +46,7 @@ class Respuesta:
     costo_usd: float = 0.0
     ms: int = 0
     llamadas_funcion: list[dict] = field(default_factory=list)
+    contenido_modelo: Any = None   # Content original del modelo (conserva las firmas de pensamiento que Gemini exige al devolver llamadas a función)
 
 
 def _precio(modelo: str) -> tuple[float, float]:
@@ -124,7 +125,7 @@ def _stub_valor(schema: dict, nombre: str = "", prof: int = 0) -> Any:
     if t == "object":
         return {k: _stub_valor(v, k, prof + 1) for k, v in (schema.get("properties") or {}).items()}
     if t == "array":
-        n = min(int(schema.get("minItems", 2) or 2), 3)
+        n = min(int(schema.get("minItems", 2) or 2), 5)
         return [_stub_valor(schema.get("items", {"type": "string"}), nombre, prof + 1) for _ in range(n)]
     if t == "integer":
         lo, hi = schema.get("minimum", 0), schema.get("maximum", 100)
@@ -215,7 +216,12 @@ class LLM:
         from google.genai import types
         partes_contents = []
         for c in contents:
-            if "function_response" in c:
+            if "model_content" in c and c["model_content"] is not None:
+                partes_contents.append(c["model_content"])   # turno del modelo tal cual (function_call + thought_signature)
+            elif "function_responses" in c:
+                partes_contents.append(types.Content(role="user", parts=[types.Part.from_function_response(name=fr["name"], response=fr["response"])
+                                                                         for fr in c["function_responses"]]))
+            elif "function_response" in c:
                 partes_contents.append(types.Content(role="user", parts=[types.Part.from_function_response(
                     name=c["function_response"]["name"], response=c["function_response"]["response"])]))
             elif "function_call" in c:
@@ -290,10 +296,12 @@ class LLM:
         tok_cache = int(getattr(um, "cached_content_token_count", 0) or 0)
         r = Respuesta(modelo=modelo, tok_in=tok_in, tok_out=tok_out, tok_think=tok_think, tok_cache=tok_cache, ms=ms)
 
-        # llamadas a función
+        # llamadas a función (se conserva el Content del modelo: Gemini 3 exige devolver la thought_signature junto con cada function_call)
         try:
             for fc in (resp.function_calls or []):
                 r.llamadas_funcion.append({"name": fc.name, "args": dict(fc.args or {})})
+            if r.llamadas_funcion and resp.candidates:
+                r.contenido_modelo = resp.candidates[0].content
         except Exception:  # noqa: BLE001
             pass
         # texto

@@ -1,0 +1,54 @@
+{% set lab = res.laboratorio %}
+    <div class="card hero">
+      <div class="row" style="gap:26px">
+        <div class="orb-wrap"><div class="orb" style="--c1:{{ avatar.color }};--c2:#06B6D4"></div><b>{{ avatar.nombre }}</b><span class="muted tiny">evaluador · reporte final</span></div>
+        <div style="flex:1;min-width:240px">
+          <div class="row" style="gap:22px;align-items:flex-end">
+            <div><div class="cap">Resultado global</div><div class="score-big grad-text">{{ lab.total|round(0)|int }}</div><span class="muted small">/100 {% if anterior and anterior.score_global is not none %}· laboratorio anterior {{ anterior.score_global|round(0)|int }} <b class="{{ 'up' if lab.total >= anterior.score_global else 'down' }}">({{ '+' if lab.total >= anterior.score_global }}{{ (lab.total - anterior.score_global)|round(0)|int }})</b>{% endif %}</span></div>
+            <div><div class="cap">Nivel</div><span class="badge-level">{{ lab.nivel }}</span><div class="muted small" style="max-width:360px">{{ lab.nivel_descripcion }}</div></div>
+          </div>
+          <p class="mt">{{ lab.sintesis }}</p>
+          <span class="chip {{ 'aqua' if lab.variante == 'generada' else '' }}">{{ 'casos nuevos (checkpoint)' if lab.variante == 'generada' else 'casos originales' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Resultado por competencia</h2>
+      <div class="grid g-1-2">
+        {% set ns = namespace(l=[]) %}{% for d in lab.dimensiones %}{% set ns.l = ns.l + [d.corto or d.nombre] %}{% endfor %}
+        <div style="height:250px"><canvas data-radar='{{ {"labels": ns.l, "values": lab.dimensiones|map(attribute="score10")|list, "max": 10}|tojson_safe }}'></canvas></div>
+        <div>
+          {% for d in lab.dimensiones %}
+          <div class="kpi-row" style="grid-template-columns:1fr 70px 130px">
+            <div><b>{{ d.nombre }}</b><div class="bar mt" style="margin-top:6px"><i style="width:{{ (d.puntos / d.maximo * 100)|round(0)|int }}%"></i></div></div>
+            <b>{{ d.puntos|round(0)|int }}<span class="muted">/{{ d.maximo }}</span></b>
+            <span class="chip {{ {'Fortalecido':'mint','Sólido':'aqua','En desarrollo':'amber','Requiere atención':'rose'}[d.radar] }}">{{ d.radar }}</span>
+          </div>{% endfor %}
+          <div class="row between mt"><b>TOTAL</b><b>{{ lab.total|round(0)|int }}/100</b></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid g2">
+      <div class="card"><h2>Tus 3 principales fortalezas</h2>{% for f in lab.fortalezas %}<div class="mb"><b>{{ loop.index }}. {{ f.nombre }}</b><div class="small"><b>Evidencia observada:</b> {{ f.evidencia }}</div><div class="muted small"><b>Por qué es valioso:</b> {{ f.por_que }}</div></div>{% endfor %}</div>
+      <div class="card"><h2>Tus 3 principales oportunidades</h2>{% for o in lab.oportunidades %}<div class="mb"><b>{{ loop.index }}. {{ o.nombre }}</b><div class="small"><b>Lo observado:</b> {{ o.observado }}</div><div class="muted small"><b>Riesgo potencial:</b> {{ o.riesgo }}</div><div class="chip aqua mt" style="margin-top:6px;white-space:normal">Cómo fortalecerlo: {{ o.como_fortalecer }}</div>{% if o.material %}<div class="tiny muted mt" style="margin-top:4px">Material: {{ o.material }}</div>{% endif %}</div>{% endfor %}</div>
+    </div>
+
+    <div class="card"><h2>Momentos clave de la simulación</h2>
+      <div class="timeline">{% for mo in lab.momentos_clave %}<div class="tl-item done"><span class="chip">Momento {{ loop.index }}</span><div class="mt" style="margin-top:6px"><b>Situación:</b> {{ mo.situacion }}</div><div class="small"><b>Tu respuesta:</b> {{ mo.respuesta }}</div><div class="muted small"><b>Lectura del evaluador:</b> {{ mo.lectura }}</div></div>{% endfor %}</div>
+    </div>
+
+    <div class="card"><h2>Lectura por habilidad</h2>
+      <div class="grid g2">{% for d in lab.dimensiones %}<div class="mb"><b>{{ d.nombre }}</b><p class="small">{{ d.lectura }}</p></div>{% endfor %}</div>
+    </div>
+
+    <div class="grid g2">
+      <div class="card"><h2>Recomendaciones prácticas</h2><ul class="list">{% for t in lab.recomendaciones %}<li><span class="n">{{ loop.index }}</span><div class="small">{{ t }}</div></li>{% endfor %}</ul></div>
+      <div class="card"><h2>Cierre</h2><p class="small">{{ lab.cierre }}</p></div>
+    </div>
+
+    {% if mostrar_transcripcion %}
+    <div class="card"><details><summary>Transcripción completa ({{ mensajes|length }} mensajes)</summary>
+      <div class="msgs mt" style="max-height:420px">{% for msg in mensajes %}{% if msg.rol in ('usuario','avatar') %}<div class="msg {{ msg.rol }}"><span class="who">{{ 'Tú' if msg.rol == 'usuario' and propia else (s.usuario_nombre if msg.rol == 'usuario' else avatar.nombre) }}</span>{{ msg.texto }}</div>{% endif %}{% endfor %}</div></details></div>
+    {% endif %}

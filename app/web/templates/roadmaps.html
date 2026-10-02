@@ -19,8 +19,8 @@
       {% set ns = namespace(next=false) %}
       {% for it in r['items'] %}
       {% set es_next = (not ns.next and it.estado == 'pendiente' and r.estado == 'activo') %}{% if es_next %}{% set ns.next = true %}{% endif %}
-      <div class="tl-item {{ 'done' if it.estado == 'completada' else '' }} {{ 'refuerzo' if it.tipo == 'refuerzo' else '' }} {{ 'next' if es_next else '' }}">
-        <div class="row between"><span class="chip {{ 'amber' if it.tipo == 'refuerzo' else '' }}">Semana {{ it.semana }} · {{ it.nivel }}{% if it.competencia %} · {{ it.competencia }}{% endif %}{% if it.tipo == 'refuerzo' %} · 🔁 refuerzo agregado por la IA{% endif %}</span>{% if it.estado == 'completada' and it.sesion_id %}<a class="btn sm" href="/sesion/{{ it.sesion_id }}/reporte">Ver reporte</a>{% elif es_next and not en_curso %}<a class="btn primary sm" href="/entrenar/{{ r.habilidad }}?item={{ it.id }}">Entrenar</a>{% endif %}</div>
+      <div class="tl-item {{ 'done' if it.estado == 'completada' else '' }} {{ 'refuerzo' if it.tipo == 'refuerzo' else '' }} {{ 'lab' if it.tipo == 'laboratorio' else '' }} {{ 'next' if es_next else '' }}">
+        <div class="row between"><span class="chip {{ 'amber' if it.tipo == 'refuerzo' else '' }}">Semana {{ it.semana }} · {{ it.nivel }}{% if it.competencia %} · {{ it.competencia }}{% endif %}{% if it.tipo == 'refuerzo' %} · 🔁 refuerzo agregado por la IA{% elif it.tipo == 'laboratorio' %} · 🧪 Laboratorio DM{% endif %}</span>{% if it.estado == 'completada' and it.sesion_id %}<a class="btn sm" href="/sesion/{{ it.sesion_id }}/reporte">Ver reporte</a>{% elif es_next and not en_curso %}<a class="btn primary sm" href="/entrenar/{{ r.habilidad }}?item={{ it.id }}">Entrenar</a>{% endif %}</div>
         <div class="mt" style="margin-top:6px"><b>{{ it.objetivo }}</b></div>{% if it.porque %}<div class="muted small">{{ it.porque }}</div>{% endif %}
       </div>{% endfor %}
     </div>

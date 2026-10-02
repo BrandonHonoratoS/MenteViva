@@ -64,13 +64,13 @@ def racha_semanas(usuario_id: int) -> int:
 
 
 def serie_scores(usuario_id: int, habilidad: str | None = None, limite: int = 12) -> list[dict]:
-    ss = [s for s in reversed(db.sesiones(usuario_id=usuario_id, habilidad=habilidad, estado="completada", limite=200)) if s["tipo"] == "practica"]
+    ss = [s for s in reversed(db.sesiones(usuario_id=usuario_id, habilidad=habilidad, estado="completada", limite=200)) if s["tipo"] in ("practica", "laboratorio")]
     return [{"fecha": _etiqueta(s["inicio"]), "iso": s["inicio"][:10], "score": s["score_global"], "habilidad": s["habilidad"], "nivel": s.get("nivel"), "id": s["id"]} for s in ss][-limite:]
 
 
 def kpis_promedio(usuario_id: int, habilidad: str, ultimas: int = 3) -> list[dict]:
     """Promedio por KPI de las últimas N sesiones de una habilidad (para radar/tendencia)."""
-    ss = [s for s in db.sesiones(usuario_id=usuario_id, habilidad=habilidad, estado="completada", limite=ultimas) if s["tipo"] == "practica"]
+    ss = [s for s in db.sesiones(usuario_id=usuario_id, habilidad=habilidad, estado="completada", limite=ultimas) if s["tipo"] in ("practica", "laboratorio")]
     acc: dict[str, list[float]] = defaultdict(list)
     nombres: dict[str, str] = {}
     for s in ss:
@@ -85,7 +85,7 @@ def kpis_promedio(usuario_id: int, habilidad: str, ultimas: int = 3) -> list[dic
 
 
 def resumen_colaborador(u: dict) -> dict:
-    ss = [s for s in db.sesiones(usuario_id=u["id"], estado="completada", limite=100) if s["tipo"] == "practica"]
+    ss = [s for s in db.sesiones(usuario_id=u["id"], estado="completada", limite=100) if s["tipo"] in ("practica", "laboratorio")]
     scores = [float(s["score_global"]) for s in ss if s["score_global"] is not None]
     ult3 = scores[:3]
     prev3 = scores[3:6]
@@ -108,7 +108,7 @@ def ficha(u: dict, incluir_feedback: bool = False) -> dict:
     perfil = db.perfil(u["id"])
     diag = perfil.get("diagnostico") or {}
     niveles = db.niveles(u["id"])
-    ss = [s for s in db.sesiones(usuario_id=u["id"], estado="completada", limite=12) if s["tipo"] == "practica"]
+    ss = [s for s in db.sesiones(usuario_id=u["id"], estado="completada", limite=12) if s["tipo"] in ("practica", "laboratorio")]
     sesiones = []
     for s in ss:
         r = s.get("resultado") or {}
@@ -140,7 +140,7 @@ def kpis_organizacion(empresa_id: int, area_id: int | None = None, dias: int = 3
     N = len(colabs)
     ids = {u["id"] for u in colabs}
     desde = (datetime.now(timezone.utc) - timedelta(days=dias)).isoformat()
-    todas = [s for s in db.sesiones(empresa_id=empresa_id, area_id=area_id, estado="completada", limite=5000) if s["tipo"] == "practica" and s["usuario_id"] in ids]
+    todas = [s for s in db.sesiones(empresa_id=empresa_id, area_id=area_id, estado="completada", limite=5000) if s["tipo"] in ("practica", "laboratorio") and s["usuario_id"] in ids]
     periodo = [s for s in todas if s["inicio"] >= desde]
 
     # participación / engagement / autodesarrollo
@@ -301,7 +301,7 @@ def kpis_organizacion(empresa_id: int, area_id: int | None = None, dias: int = 3
 def resumen_para_analista(empresa_id: int, area_id: int | None = None, dias: int = 7) -> dict:
     k = kpis_organizacion(empresa_id, area_id=area_id, dias=dias)
     desde = (datetime.now(timezone.utc) - timedelta(days=dias)).isoformat()
-    ss = [s for s in db.sesiones(empresa_id=empresa_id, area_id=area_id, estado="completada", desde=desde, limite=300) if s["tipo"] == "practica"]
+    ss = [s for s in db.sesiones(empresa_id=empresa_id, area_id=area_id, estado="completada", desde=desde, limite=300) if s["tipo"] in ("practica", "laboratorio")]
     return {
         "periodo_dias": dias, "colaboradores": k["colaboradores"], "activos": k["activos"],
         "indices": {n: v["valor"] for n, v in k["indices"].items()},

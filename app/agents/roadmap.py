@@ -164,6 +164,8 @@ def generar_roadmap(usuario: dict, habilidad_id: str, brecha: str = "media", ses
         ia = items_ia[i] if i < len(items_ia) else {}
         items.append({**a, "objetivo": (ia.get("objetivo") or f"Sesión {i + 1}: practicar {a['competencia'] or hab['corto']} en nivel {a['nivel']}")[:300],
                       "porque": (ia.get("porque") or "")[:300], "agregado_por": agregado_por})
+    if habilidad_id == "ruta_dm":
+        items = _intercalar_laboratorio(usuario, items, nivel)
     rid = db.crear_roadmap(usuario["id"], habilidad_id, nivel, objetivo=js.get("objetivo") or f"Avanzar en {hab['nombre']} desde {nivel}",
                            razon=js.get("razon") or motivo, items=items, horizonte=horizonte, sesiones_semana=sesiones_semana, requiere_aprobacion=requiere_aprobacion)
     if requiere_aprobacion and usuario.get("empresa_id"):
@@ -172,6 +174,24 @@ def generar_roadmap(usuario: dict, habilidad_id: str, brecha: str = "media", ses
                            evidencia=f"La habilidad no forma parte del rol declarado ({', '.join(ob.get('funciones') or []) or 'sin funciones'}); "
                                      f"Elena la propone por brecha {brecha}.", usuario_id=usuario["id"], clave=f"roadmap:{rid}")
     return rid
+
+
+def _intercalar_laboratorio(usuario: dict, items: list[dict], nivel: str) -> list[dict]:
+    """La Ruta DM arranca con el Laboratorio DM (si la persona nunca lo ha hecho) y repite un checkpoint cada CHECKPOINT_CADA sesiones."""
+    from . import laboratorio as L
+    hechos = db.sesiones(usuario_id=usuario["id"], habilidad="ruta_dm", estado="completada", tipo="laboratorio", limite=1)
+    out: list[dict] = []
+    if not hechos:
+        out.append({"semana": 1, "nivel": nivel, "competencia": "", "formato": "laboratorio", "tipo": "laboratorio", "agregado_por": "elena",
+                    "objetivo": "Laboratorio DM: dos casos reales (entrega bajo presión y war room) que miden escucha activa, manejo del estrés, gestión de proyectos y comunicación ejecutiva",
+                    "porque": "Es el punto de partida de la Ruta DM: fija tu evidencia inicial en cuatro competencias y la prioridad de tu plan."})
+    for i, it in enumerate(items, start=1):
+        out.append(it)
+        if i % L.CHECKPOINT_CADA == 0 and i < len(items):
+            out.append({"semana": it["semana"], "nivel": nivel, "competencia": "", "formato": "laboratorio", "tipo": "laboratorio", "agregado_por": "elena",
+                        "objetivo": "Checkpoint del Laboratorio DM: dos casos nuevos para medir tu avance en escucha, presión, gestión de proyectos y comunicación ejecutiva",
+                        "porque": f"Cada {L.CHECKPOINT_CADA} sesiones el laboratorio vuelve a medirte con casos distintos (sin memorización)."})
+    return out
 
 
 def _orden_competencias_dm(nivel_siguiente: str, diag: dict, dominio: dict) -> list[str]:

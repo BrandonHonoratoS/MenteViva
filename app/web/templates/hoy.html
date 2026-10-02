@@ -24,10 +24,10 @@
         {% set hab = HABILIDADES[siguiente.habilidad] %}{% set av = AVATARES[hab.agente] %}
         <div class="orb" style="--c1:{{ av.color }};--c2:#06B6D4"></div>
         <div style="flex:1;min-width:240px">
-          <span class="chip">Tu siguiente sesión · semana {{ siguiente.semana }}{% if siguiente.tipo == 'refuerzo' %} · refuerzo{% endif %}</span>
+          <span class="chip">Tu siguiente sesión · semana {{ siguiente.semana }}{% if siguiente.tipo == 'refuerzo' %} · refuerzo{% elif siguiente.tipo == 'laboratorio' %} · 🧪 Laboratorio DM{% endif %}</span>
           <h2 style="font-size:1.4rem;margin-top:8px">{{ siguiente.objetivo }}</h2>
           <p class="muted">{{ hab.nombre }} con {{ av.nombre }} · nivel {{ siguiente.nivel }}{% if siguiente.competencia %} · {{ siguiente.competencia }}{% endif %}{% if siguiente.porque %}<br><i>{{ siguiente.porque }}</i>{% endif %}</p>
-          <div class="row mt"><a class="btn primary lg" href="/entrenar/{{ siguiente.habilidad }}?item={{ siguiente.id }}">Entrenar ahora</a><a class="btn" href="/roadmaps">Ver mi plan</a></div>
+          <div class="row mt"><a class="btn primary lg" href="{{ '/laboratorio?item=' ~ siguiente.id if siguiente.tipo == 'laboratorio' else '/entrenar/' ~ siguiente.habilidad ~ '?item=' ~ siguiente.id }}">{{ 'Entrar al laboratorio' if siguiente.tipo == 'laboratorio' else 'Entrenar ahora' }}</a><a class="btn" href="/roadmaps">Ver mi plan</a></div>
         </div>
       </div>
     </div>

@@ -6,6 +6,7 @@ from fastapi.responses import RedirectResponse
 
 from .. import db, metrics
 from ..agents import catalogo as C
+from ..agents import laboratorio as L
 from ..agents import motor
 from ..agents.avatares import AVATARES
 from ..llm import PresupuestoAgotado
@@ -126,6 +127,8 @@ def entrenar(request: Request, habilidad: str, u: dict = Depends(colab), item: i
     it = None if item == 0 else (db.roadmap_item(item) if item else db.siguiente_item(u["id"], habilidad))
     if it and (it["usuario_id"] != u["id"] or it["estado"] != "pendiente" or it.get("roadmap_estado") != "activo"):
         it = None
+    if it and it.get("tipo") == "laboratorio":
+        return RedirectResponse(f"/laboratorio?item={it['id']}", status_code=307)
     niv = db.nivel(u["id"], habilidad) or {}
     nivel = (it or {}).get("nivel") or niv.get("nivel") or hab["niveles"][0]
     sig_dm = C.nivel_dm_siguiente(nivel) if habilidad == "ruta_dm" else None
@@ -157,6 +160,47 @@ def entrenar_iniciar(request: Request, habilidad: str, u: dict = Depends(colab),
     return RedirectResponse(f"/sesion/{s['id']}", status_code=303)
 
 
+# ── Laboratorio DM ───────────────────────────────────────────────────────────
+def _lab_disponible(u: dict) -> dict:
+    hab = C.habilidad("ruta_dm")
+    if not hab or hab not in _habilidades(u):
+        raise HTTPException(404, "El Laboratorio DM no está habilitado para tu empresa.")
+    return hab
+
+
+@router.get("/laboratorio")
+def laboratorio(request: Request, u: dict = Depends(colab), item: int | None = None):
+    hab = _lab_disponible(u)
+    perfil = db.perfil(u["id"])
+    if perfil.get("estado") != "completo":
+        return RedirectResponse("/diagnostico", status_code=307)
+    en_curso = db.sesion_en_curso(u["id"])
+    if en_curso:
+        return RedirectResponse(f"/sesion/{en_curso['id']}", status_code=307)
+    it = db.roadmap_item(item) if item else None
+    if it and (it["usuario_id"] != u["id"] or it["estado"] != "pendiente" or it.get("tipo") != "laboratorio"):
+        it = None
+    previos = db.sesiones(usuario_id=u["id"], habilidad="ruta_dm", estado="completada", tipo="laboratorio", limite=10)
+    return render(request, "laboratorio.html", u, hab=hab, item=it, avatar=AVATARES["juan"], previos=previos, lab=L, niv=db.nivel(u["id"], "ruta_dm") or {},
+                  ultimo=(previos[0].get("resultado") or {}).get("laboratorio") if previos else None)
+
+
+@router.post("/laboratorio/iniciar")
+def laboratorio_iniciar(request: Request, u: dict = Depends(colab), csrf: str = Form(""), item: int = Form(0)):
+    verificar_csrf(request, u, csrf)
+    _lab_disponible(u)
+    it = db.roadmap_item(item) if item else None
+    if it and (it["usuario_id"] != u["id"] or it["estado"] != "pendiente"):
+        it = None
+    try:
+        s = motor.iniciar(db.usuario(u["id"]), "ruta_dm", item=it, tipo="laboratorio", voluntaria=it is None)
+    except motor.SesionOcupada as e:
+        raise HTTPException(409, str(e))
+    except (PresupuestoAgotado, ErrorLLM) as e:
+        raise HTTPException(503, str(e))
+    return RedirectResponse(f"/sesion/{s['id']}", status_code=303)
+
+
 # ── sesión y reporte ─────────────────────────────────────────────────────────
 @router.get("/sesion/{sid}")
 def sesion(request: Request, sid: int, u: dict = Depends(requiere_usuario)):
@@ -167,7 +211,7 @@ def sesion(request: Request, sid: int, u: dict = Depends(requiere_usuario)):
         return RedirectResponse(f"/sesion/{sid}/reporte", status_code=307)
     hab = C.HABILIDADES[s["habilidad"]]
     return render(request, "sesion.html", u, s=s, hab=hab, avatar=AVATARES[s["agente"]], mensajes=db.mensajes(sid),
-                  turnos_max=C.turnos_max(s["habilidad"], s.get("nivel")), duracion=C.duracion_min(s["habilidad"], s.get("nivel")), propia=s["usuario_id"] == u["id"])
+                  turnos_max=C.turnos_max_sesion(s), duracion=C.duracion_sesion(s), propia=s["usuario_id"] == u["id"])
 
 
 @router.get("/sesion/{sid}/reporte")
@@ -182,7 +226,7 @@ def reporte(request: Request, sid: int, u: dict = Depends(requiere_usuario)):
     hab = C.HABILIDADES[s["habilidad"]]
     res = s.get("resultado") or {}
     anterior = next((x for x in db.sesiones(usuario_id=s["usuario_id"], habilidad=s["habilidad"], estado="completada", limite=20)
-                     if x["id"] < sid and x["tipo"] == "practica"), None)
+                     if x["id"] < sid and x["tipo"] == ("laboratorio" if s["tipo"] == "laboratorio" else "practica")), None)
     chat = db.obtener_chat(u["id"], f"reporte:{sid}") if s["usuario_id"] == u["id"] else None
     analisis = db.analisis(s["empresa_id"], tipo="post_sesion", sesion_id=sid, limite=1) if u["rol"] in ("rrhh", "director", "dg") else []
     return render(request, "reporte.html", u, s=s, hab=hab, res=res, avatar=AVATARES[s["agente"]], anterior=anterior, chat=chat, propia=s["usuario_id"] == u["id"],

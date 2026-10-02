@@ -18,9 +18,10 @@ from ..llm import PresupuestoAgotado, llm
 from ..llm.gemini import ErrorLLM
 from . import catalogo as C
 from . import esquemas as E
+from . import laboratorio as L
 from . import prompts as P
 from . import validar as V
-from .avatares import AVATARES, Juan, agente_para, json_compacto, transcript_texto
+from .avatares import AVATARES, Juan, _texto_perfil, agente_para, json_compacto, transcript_texto
 
 log = logging.getLogger("mv.motor")
 _LOCKS: dict[int, threading.Lock] = {}
@@ -56,12 +57,23 @@ def iniciar(usuario: dict, habilidad_id: str, item: dict | None = None, nivel: s
     if habilidad_id == "ventas":
         escenario.setdefault("etapa_debil", ob.get("etapa_debil", ""))
         escenario.setdefault("producto", ob.get("producto_concreto", ""))
-    if habilidad_id == "ruta_dm" and not competencia:
+    if tipo == "laboratorio":
+        # Laboratorio DM: la primera vez corre el guion fijo del documento; en checkpoints Juan genera casos equivalentes.
+        previos = [s for s in db.sesiones(usuario_id=usuario["id"], habilidad="ruta_dm", estado="completada", tipo="laboratorio", limite=5)]
+        competencia = ""
+        objetivo = objetivo or "Laboratorio DM: diagnóstico de escucha activa, manejo del estrés, gestión de proyectos y comunicación ejecutiva en dos casos"
+        escenario = {"laboratorio": True, "titulo": L.NOMBRE, "variante": "generada" if previos else "fija", "caso": 0, "evento": 0, "profundizo": False,
+                     "respondidos": 0, "formato": "laboratorio", "encuadre": "Dos situaciones profesionales; responde como actuarías. El reporte llega al final.",
+                     "situacion": "", "numero": len(previos) + 1}
+        if not previos:
+            escenario["casos"] = L.CASOS_FIJOS
+    elif habilidad_id == "ruta_dm" and not competencia:
         sig = C.nivel_dm_siguiente(nivel) or nivel
         competencia = (C.competencias_dm(sig) or ["Comunicación"])[0]
 
     sid = db.crear_sesion(usuario["id"], habilidad_id, agente.id, tipo=tipo, roadmap_item_id=(item or {}).get("id"), nivel=nivel,
-                          competencia=competencia, objetivo=objetivo, escenario=escenario, voluntaria=voluntaria)
+                          competencia=competencia, formato="laboratorio" if tipo == "laboratorio" else "", objetivo=objetivo, escenario=escenario,
+                          voluntaria=voluntaria)
     db.log("info", "sesion", f"Sesión {sid} iniciada", f"{habilidad_id} · {nivel} · {competencia or '-'}", usuario["email"])
     try:
         continuar(db.sesion(sid), usuario)
@@ -87,6 +99,8 @@ def continuar(sesion: dict, usuario: dict) -> dict | None:
         agente = agente_para(sesion["habilidad"])
         perfil = db.perfil(usuario["id"])
         escenario = dict(sesion.get("escenario") or {})
+        if sesion["tipo"] == "laboratorio":
+            return _continuar_laboratorio(sesion, usuario, perfil, escenario)
         if agente is Juan and not escenario.get("titulo"):
             historial = _historial_competencia(usuario["id"], sesion.get("competencia") or "")
             prompt, schema = Juan.prompt_diseno(sesion, usuario, perfil, historial)
@@ -114,6 +128,110 @@ def continuar(sesion: dict, usuario: dict) -> dict | None:
         return {"texto": ultimo["texto"], **(ultimo.get("meta") or {})}
     finally:
         lk.release()
+
+
+# ── Laboratorio DM (Juan como evaluador neutral; avance determinista por eventos) ──
+def _meta_lab(escenario: dict, estado: str = "en_curso", tension: int | None = None) -> dict:
+    casos = escenario.get("casos") or []
+    ci, ei = int(escenario.get("caso", 0)), int(escenario.get("evento", 0))
+    meta = {"estado": estado, "lab": {"caso": ci + 1, "casos": len(casos), "evento": ei + 1, "eventos": len(casos[ci]["eventos"]) if casos and ci < len(casos) else 0,
+                                      "titulo": casos[ci]["titulo"] if casos and ci < len(casos) else "", "respondidos": int(escenario.get("respondidos", 0)),
+                                      "total": L.total_eventos(casos) if casos else 0}}
+    if tension is not None:
+        meta["tension"] = tension
+    return meta
+
+
+def _continuar_laboratorio(sesion: dict, usuario: dict, perfil: dict, escenario: dict) -> dict | None:
+    sid = sesion["id"]
+    if not escenario.get("casos"):
+        # checkpoint: Juan genera dos casos equivalentes ambientados en el contexto real de la persona
+        ob = perfil.get("onboarding", {})
+        contexto = _texto_perfil(usuario, ob, perfil.get("diagnostico"), incluir_ventas=False)
+        r = llm.generar(origen="juan.lab_variante", system=P.JUAN_LAB_VARIANTE.format(contexto=contexto), contents=[{"role": "user", "text": "Genera los dos casos."}],
+                        schema=E.CASOS_LAB, thinking=settings.GEMINI_THINKING_ANALISIS, max_tokens=7000, temperatura=0.8, usuario_id=usuario["id"], sesion_id=sid)
+        casos = L.normalizar_casos(r.json)
+        if not casos:
+            V.registrar_si_incompleto("juan.lab_variante", r.json, usuario.get("email", ""))
+            raise ErrorLLM("Juan no pudo diseñar los casos del checkpoint. Pulsa Reintentar.")
+        escenario["casos"] = casos
+        db.actualizar_sesion(sid, escenario_json=escenario)
+    mensajes = [m for m in db.mensajes(sid) if m["rol"] in ("usuario", "avatar")]
+    if not mensajes:
+        meta = _meta_lab(escenario, tension=10)
+        db.guardar_mensaje(sid, "avatar", L.MENSAJE_BIENVENIDA, meta)
+        return {"texto": L.MENSAJE_BIENVENIDA, **meta}
+    if mensajes[-1]["rol"] == "usuario":
+        if not escenario.get("iniciado"):
+            # confirmación de la persona → Caso 1, evento 1 (texto fijo, sin llamar al modelo)
+            escenario["iniciado"] = True
+            db.actualizar_sesion(sid, escenario_json=escenario)
+            texto = L.texto_evento(escenario["casos"], 0, 0)
+            meta = _meta_lab(escenario, tension=35)
+            db.guardar_mensaje(sid, "avatar", texto, meta)
+            return {"texto": texto, **meta}
+        return _turno_laboratorio(sesion, usuario, perfil, escenario)
+    ultimo = mensajes[-1]
+    return {"texto": ultimo["texto"], **(ultimo.get("meta") or {})}
+
+
+def _estado_lab_texto(escenario: dict) -> str:
+    casos = escenario["casos"]
+    ci, ei = int(escenario.get("caso", 0)), int(escenario.get("evento", 0))
+    caso, ev = casos[ci], casos[ci]["eventos"][ei]
+    sig = L.siguiente(casos, ci, ei)
+    lineas = [f"Caso {ci + 1} de {len(casos)}: {caso['titulo']}. Personajes: {caso.get('personajes') or '—'}. Contexto: {caso['contexto']}",
+              f"Evento actual ({ei + 1} de {len(caso['eventos'])}) «{ev['titulo']}»: {ev['texto']} Pregunta planteada: «{ev['pregunta']}»",
+              f"Profundización usada en este evento: {'sí (ya no puedes profundizar; debes avanzar)' if escenario.get('profundizo') else 'no'}."]
+    if sig is None:
+        lineas.append("Siguiente paso: NO hay más eventos; la persona acaba de responder el último → cierra el laboratorio (accion fin).")
+    elif sig[0] != ci:
+        lineas.append(f"Siguiente paso: termina el Caso {ci + 1} y el sistema presentará el Caso {sig[0] + 1} «{casos[sig[0]]['titulo']}».")
+    else:
+        lineas.append(f"Siguiente paso: el sistema presentará el evento «{casos[ci]['eventos'][sig[1]]['titulo']}» (no lo escribas tú).")
+    return "\n".join(lineas)
+
+
+def _turno_laboratorio(sesion: dict, usuario: dict, perfil: dict, escenario: dict) -> dict:
+    sid = sesion["id"]
+    mensajes = db.mensajes(sid)
+    contents = _contenidos(sesion, mensajes)
+    system = P.JUAN_LABORATORIO.format(estado=_estado_lab_texto(escenario))
+    r = llm.generar(origen="juan.laboratorio", system=system, contents=contents, schema=E.TURNO_LAB, max_tokens=700, temperatura=0.7,
+                    usuario_id=usuario["id"], sesion_id=sid)
+    V.registrar_si_incompleto("juan.laboratorio", r.json, usuario.get("email", ""))
+    js = r.json if isinstance(r.json, dict) else {}
+    texto = V._texto(js.get("mensaje")) or (r.texto.strip() if r.texto and not r.texto.strip().startswith("{") else "")
+    if not texto:
+        raise ErrorLLM("La IA devolvió una respuesta vacía o incompleta. Pulsa Reintentar.")
+    accion = js.get("accion") if js.get("accion") in ("avanzar", "profundizar", "fin") else "avanzar"
+    tension = int(V._num(js.get("tension"), 0, 100, default=40))
+    casos = escenario["casos"]
+    ci, ei = int(escenario.get("caso", 0)), int(escenario.get("evento", 0))
+    sig = L.siguiente(casos, ci, ei)
+    if accion == "profundizar" and not escenario.get("profundizo"):
+        escenario["profundizo"] = True
+        db.actualizar_sesion(sid, escenario_json=escenario)
+        meta = _meta_lab(escenario, tension=tension)
+        db.guardar_mensaje(sid, "avatar", texto, meta)
+        return {"texto": texto, **meta}
+    escenario["respondidos"] = int(escenario.get("respondidos", 0)) + 1
+    escenario["profundizo"] = False
+    if sig is None:
+        escenario["terminado"] = True
+        db.actualizar_sesion(sid, escenario_json=escenario)
+        meta = _meta_lab(escenario, estado="fin", tension=tension)
+        db.guardar_mensaje(sid, "avatar", texto, meta)
+        return {"texto": texto, **meta}
+    escenario["caso"], escenario["evento"] = sig
+    db.actualizar_sesion(sid, escenario_json=escenario)
+    texto = texto.rstrip() + "\n\n" + L.texto_evento(casos, *sig)
+    meta = _meta_lab(escenario, tension=tension)
+    db.guardar_mensaje(sid, "avatar", texto, meta)
+    if tension > int(sesion.get("tension_max") or 0):
+        db.actualizar_sesion(sid, tension_max=tension)
+    _quiza_resumir(sesion, usuario)
+    return {"texto": texto, **meta}
 
 
 def _historial_competencia(usuario_id: int, competencia: str) -> list[dict]:
@@ -183,6 +301,16 @@ def turno(sesion: dict, usuario: dict, texto: str) -> dict:
         db.guardar_mensaje(sesion["id"], "usuario", texto)
         sesion = db.sesion(sesion["id"])
         perfil = db.perfil(usuario["id"])
+        if sesion["tipo"] == "laboratorio":
+            escenario = dict(sesion.get("escenario") or {})
+            if texto.lower().strip(" .!¡¿?") in ("fin", "terminar", "adiós", "adios", "ya") or int(sesion["turnos"]) >= L.TURNOS_MAX:
+                cierre = "Entendido. El laboratorio concluye aquí; el reporte se genera con lo respondido hasta este momento."
+                escenario["terminado"] = True
+                db.actualizar_sesion(sesion["id"], escenario_json=escenario)
+                meta = _meta_lab(escenario, estado="fin")
+                db.guardar_mensaje(sesion["id"], "avatar", cierre, meta)
+                return {"texto": cierre, **meta}
+            return _continuar_laboratorio(sesion, usuario, perfil, escenario)
         if int(sesion["turnos"]) >= settings.TURNOS_MAX_SESION:
             db.guardar_mensaje(sesion["id"], "avatar", "Con esto cerramos la práctica por hoy. Vamos al análisis.", {"estado": "fin"})
             return {"texto": "Con esto cerramos la práctica por hoy. Vamos al análisis.", "estado": "fin"}
@@ -227,7 +355,8 @@ def terminar(sesion: dict, usuario: dict, en_hilo: bool = True) -> None:
     sesion = db.sesion(sesion["id"])
     if sesion["estado"] != "en_curso":
         return
-    if int(sesion["turnos"]) == 0:
+    sin_contenido = int(sesion["turnos"]) == 0 or (sesion["tipo"] == "laboratorio" and int((sesion.get("escenario") or {}).get("respondidos", 0)) == 0)
+    if sin_contenido:
         db.actualizar_sesion(sesion["id"], estado="descartada", fin=db.now())
         return
     db.actualizar_sesion(sesion["id"], estado="analizando", fin=db.now())
@@ -254,13 +383,26 @@ def analizar(sesion_id: int) -> None:
         if sesion["tipo"] == "diagnostico":
             roadmap.analizar_diagnostico(sesion, usuario, transcript)
             return
-        prompt, schema = agente.prompt_feedback(sesion)
-        r = llm.generar(origen=f"{agente.id}.feedback", system=prompt, contents=[{"role": "user", "text": "TRANSCRIPCIÓN:\n" + transcript}], schema=schema,
-                        thinking=settings.GEMINI_THINKING_ANALISIS, max_tokens=8000, temperatura=0.3, usuario_id=usuario["id"], sesion_id=sesion_id)
-        if not isinstance(r.json, dict):
-            raise ErrorLLM("El análisis no devolvió un resultado válido. Pulsa Reintentar análisis.")
-        resultado = {"elena": V.feedback_entrevistas, "celeste": V.feedback_ventas, "juan": V.feedback_dm}[agente.id](r.json, sesion)
-        score = agente.score(resultado, sesion)
+        if sesion["tipo"] == "laboratorio":
+            esc = sesion.get("escenario") or {}
+            prompt = P.FEEDBACK_LABORATORIO.format(base=L.base_conocimiento_texto(),
+                                                   dimensiones="\n".join(f"- {d['id']} · {d['nombre']} — {d['puntos']} puntos. Considera: {d['criterios']}" for d in L.DIMENSIONES))
+            contenido = "GUION DE LOS CASOS (lógica interna, no la vio la persona):\n" + L.guion_para_evaluacion(esc.get("casos") or L.CASOS_FIJOS) + "\n\nTRANSCRIPCIÓN:\n" + transcript
+            r = llm.generar(origen="juan.lab_feedback", system=prompt, contents=[{"role": "user", "text": contenido}], schema=E.FEEDBACK_LAB,
+                            thinking=settings.GEMINI_THINKING_ANALISIS, max_tokens=9000, temperatura=0.3, usuario_id=usuario["id"], sesion_id=sesion_id)
+            if not isinstance(r.json, dict):
+                raise ErrorLLM("El reporte del laboratorio no devolvió un resultado válido. Pulsa Reintentar análisis.")
+            V.registrar_si_incompleto("juan.lab_feedback", r.json, usuario.get("email", ""))
+            resultado = V.feedback_laboratorio(r.json, sesion)
+            score = float(resultado["laboratorio"]["total"])
+        else:
+            prompt, schema = agente.prompt_feedback(sesion)
+            r = llm.generar(origen=f"{agente.id}.feedback", system=prompt, contents=[{"role": "user", "text": "TRANSCRIPCIÓN:\n" + transcript}], schema=schema,
+                            thinking=settings.GEMINI_THINKING_ANALISIS, max_tokens=8000, temperatura=0.3, usuario_id=usuario["id"], sesion_id=sesion_id)
+            if not isinstance(r.json, dict):
+                raise ErrorLLM("El análisis no devolvió un resultado válido. Pulsa Reintentar análisis.")
+            resultado = {"elena": V.feedback_entrevistas, "celeste": V.feedback_ventas, "juan": V.feedback_dm}[agente.id](r.json, sesion)
+            score = agente.score(resultado, sesion)
         resultado["score_global_100"] = score
         resultado["turnos"] = sesion["turnos"]
         db.actualizar_sesion(sesion_id, estado="completada", score_global=score, resultado_json=resultado)

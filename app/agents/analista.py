@@ -13,6 +13,7 @@ from ..llm import PresupuestoAgotado, llm
 from ..llm.gemini import ErrorLLM
 from . import catalogo as C
 from . import esquemas as E
+from . import laboratorio as L
 from . import prompts as P
 from . import validar as V
 from .avatares import json_compacto
@@ -26,7 +27,7 @@ def post_sesion(sesion: dict, usuario: dict) -> None:
     resultado = sesion.get("resultado") or {}
     score = float(sesion.get("score_global") or 0)
     decisiones: list[str] = []
-    historial = [s for s in reversed(db.sesiones(usuario_id=usuario["id"], habilidad=sesion["habilidad"], estado="completada", limite=50)) if s["tipo"] == "practica"]
+    historial = [s for s in reversed(db.sesiones(usuario_id=usuario["id"], habilidad=sesion["habilidad"], estado="completada", limite=50)) if s["tipo"] in ("practica", "laboratorio")]
     scores = [float(s["score_global"] or 0) for s in historial]
     niv = db.nivel(usuario["id"], sesion["habilidad"]) or {}
     nivel_actual = niv.get("nivel") or sesion.get("nivel") or hab["niveles"][0]
@@ -52,6 +53,31 @@ def post_sesion(sesion: dict, usuario: dict) -> None:
             _renivelar_pendientes(usuario["id"], sesion["habilidad"], nuevo_nivel)
             db.notificar(usuario["id"], f"{hab['corto']}: ahora estás en nivel {nuevo_nivel}", decisiones[-1], "/roadmaps", "exito" if niveles.index(nuevo_nivel) > i else "aviso")
         db.actualizar_nivel_stats(usuario["id"], sesion["habilidad"], score, sin_mejora)
+    elif sesion["tipo"] == "laboratorio":  # Laboratorio DM: cada dimensión es evidencia de las competencias DM que mapea
+        lab = resultado.get("laboratorio") or {}
+        dom = niv.get("competencias") or {}
+        nuevas = {}
+        for d in lab.get("dimensiones", []):
+            s10 = float(d.get("score10") or 0)
+            for comp in (L.dimension(d["id"]) or {}).get("competencias_dm", []):
+                prev = dom.get(comp) if isinstance(dom.get(comp), dict) else {}
+                nuevas[comp] = {"score": round(s10, 1), "dominio": C.dominio_dm(s10), "fecha": db.now(), "sesiones": int(prev.get("sesiones", 0)) + 1,
+                                "mejor": max(s10, float(prev.get("mejor", 0))), "fuente": "laboratorio"}
+        dom.update(nuevas)
+        db.guardar_nivel(usuario["id"], "ruta_dm", nivel_actual, competencias=nuevas)
+        db.actualizar_nivel_stats(usuario["id"], "ruta_dm", score, sin_mejora)
+        decisiones.append(f"Laboratorio DM #{(sesion.get('escenario') or {}).get('numero', 1)}: {lab.get('total', score):.0f}/100 · {lab.get('nivel', '')}. "
+                          + " · ".join(f"{d['nombre']} {d['puntos']:.0f}/{d['maximo']}" for d in lab.get("dimensiones", [])))
+        prio = lab.get("prioridad") or {}
+        if prio.get("nombre"):
+            decisiones.append(f"Prioridad de desarrollo: {prio['nombre']}.")
+            comp_prio = (L.dimension(prio.get("dimension", "")) or {}).get("competencias_dm", [""])[0]
+            if comp_prio and _priorizar_competencia_dm(usuario, comp_prio):
+                decisiones.append(f"El plan de la Ruta DM se reordenó: la siguiente sesión entrena {comp_prio}.")
+        _programar_checkpoint_lab(usuario, sesion)
+        prop = evaluar_ascenso_dm(usuario, nivel_actual, dom)
+        if prop:
+            decisiones.append(prop)
     else:  # ruta_dm: dominio por competencia y regla de ascenso con aprobación de RRHH
         comp = sesion.get("competencia") or ""
         s10 = float(resultado.get("score_global") or score / 10)
@@ -79,8 +105,21 @@ def post_sesion(sesion: dict, usuario: dict) -> None:
 
     # metas del líder alcanzadas
     for m in db.metas(usuario["empresa_id"], area_id=usuario.get("area_id"), usuario_id=usuario["id"]) if usuario.get("empresa_id") else []:
-        if m["habilidad"] == sesion["habilidad"] and len(scores) >= 2 and sum(scores[-2:]) / 2 >= float(m["score_minimo"] or 0) and sesion["habilidad"] != "ruta_dm":
-            decisiones.append(f"Meta del líder alcanzada: promedio de las últimas 2 sesiones ≥ {m['score_minimo']:.0f}.")
+        if m["habilidad"] != sesion["habilidad"] or (m.get("competencia") and m["competencia"] != (sesion.get("competencia") or "")):
+            continue
+        rel = [float(s["score_global"] or 0) for s in historial if not m.get("competencia") or s.get("competencia") == m["competencia"]]
+        minimo = float(m["score_minimo"] or 0)
+        cumple = len(rel) >= 2 and sum(rel[-2:]) / 2 >= minimo
+        ya_cumplia = len(rel) >= 3 and sum(rel[-3:-1]) / 2 >= minimo
+        if cumple and not ya_cumplia:
+            decisiones.append(f"Meta del líder alcanzada ({hab['corto']}{' · ' + m['competencia'] if m.get('competencia') else ''} ≥ {minimo:.0f}): promedio de las últimas 2 sesiones {sum(rel[-2:]) / 2:.0f}.")
+            if m.get("usuario_id") == usuario["id"] and m.get("estado") == "activa":
+                db.cerrar_meta(m["id"], "alcanzada")
+            creador = db.usuario(m["creado_por"]) if m.get("creado_por") else None
+            for d in {x["id"]: x for x in ([creador] if creador else []) + _director_de(usuario)}.values():
+                db.notificar(d["id"], f"Meta alcanzada: {usuario['nombre']}", f"{hab['corto']}{' · ' + m['competencia'] if m.get('competencia') else ''}: promedio ≥ {minimo:.0f} en sus últimas 2 sesiones.",
+                             f"/colaborador/{usuario['id']}", "exito")
+            db.notificar(usuario["id"], "¡Alcanzaste una meta de tu líder!", f"{hab['corto']}: promedio ≥ {minimo:.0f} en tus últimas 2 sesiones.", "/historial", "exito")
 
     # narrativa del analista (modelo ligero, entrada compacta) + siguiente objetivo
     analisis = _narrativa_post_sesion(sesion, usuario, hab, scores, nivel_actual, nuevo_nivel, decisiones, resultado)
@@ -166,6 +205,108 @@ def _completar_roadmap_si_termino(usuario: dict, habilidad: str) -> None:
                             motivo="continuación tras completar el plan anterior", agregado_por="analista")
         except (PresupuestoAgotado, ErrorLLM) as e:
             db.log("warn", "analista", "No se pudo generar el siguiente roadmap", str(e), usuario["email"])
+
+
+def _priorizar_competencia_dm(usuario: dict, competencia: str, notificar: bool = True) -> bool:
+    """Tras el laboratorio, la competencia señalada como prioridad pasa a ser la siguiente sesión del plan de la Ruta DM."""
+    rm = db.roadmap_activo(usuario["id"], "ruta_dm")
+    if not rm:
+        return False
+    pendientes = [it for it in rm["items"] if it["estado"] == "pendiente" and it.get("tipo") != "laboratorio"]
+    if not pendientes:
+        return False
+    objetivo = next((it for it in pendientes if it.get("competencia") == competencia), None)
+    if objetivo and objetivo["id"] == pendientes[0]["id"]:
+        return False
+    if objetivo:
+        db.intercambiar_items(pendientes[0]["id"], objetivo["id"])
+        if notificar:   # uso independiente: cuenta como un ajuste; desde recalibrar_por_meta el ajuste se registra una sola vez
+            db.actualizar_roadmap(rm["id"], ajustes=int(rm.get("ajustes") or 0) + 1, version=int(rm.get("version") or 1) + 1)
+    else:   # la competencia prioritaria no estaba en el plan (es de un nivel ya cursado): se inserta una sesión al frente
+        ultimo = max([it["orden"] for it in rm["items"] if it["estado"] == "completada"], default=0)
+        db.insertar_item(rm["id"], ultimo, {"semana": pendientes[0]["semana"], "tipo": "sesion", "nivel": pendientes[0].get("nivel"), "competencia": competencia,
+                                            "formato": C.formato_sugerido(competencia), "objetivo": f"Prioridad del laboratorio: fortalecer {competencia} en una situación real de proyecto",
+                                            "porque": "El Laboratorio DM señaló esta dimensión como tu principal prioridad de desarrollo.", "agregado_por": "analista"})
+    if notificar:
+        db.notificar(usuario["id"], "Tu plan se reordenó con el laboratorio", f"Tu siguiente sesión con Juan entrena {competencia}, la prioridad que mostró el laboratorio.", "/roadmaps", "aviso")
+    return True
+
+
+def _programar_checkpoint_lab(usuario: dict, sesion: dict) -> None:
+    """Garantiza un checkpoint del laboratorio más adelante en el plan activo de la Ruta DM (cada CHECKPOINT_CADA sesiones)."""
+    rm = db.roadmap_activo(usuario["id"], "ruta_dm")
+    if not rm:
+        return
+    pendientes = [it for it in rm["items"] if it["estado"] == "pendiente"]
+    if any(it.get("tipo") == "laboratorio" for it in pendientes):
+        return
+    practicas = [it for it in pendientes if it.get("tipo") != "laboratorio"]
+    if len(practicas) < 3:
+        return
+    ancla = practicas[min(L.CHECKPOINT_CADA, len(practicas)) - 1]
+    db.insertar_item(rm["id"], ancla["orden"], {"semana": ancla["semana"], "tipo": "laboratorio", "nivel": ancla.get("nivel"), "competencia": "", "formato": "laboratorio",
+                                                "objetivo": "Checkpoint del Laboratorio DM: dos casos nuevos para medir tu avance en escucha, presión, gestión de proyectos y comunicación ejecutiva",
+                                                "porque": f"El Analista programa un checkpoint cada {L.CHECKPOINT_CADA} sesiones de la Ruta DM.", "agregado_por": "analista"})
+
+
+# ── recalibración por una meta nueva del líder ───────────────────────────────
+def recalibrar_por_meta(meta_id: int, maximo_personas: int = 40) -> int:
+    """Cuando RRHH o un director crean una meta, los planes ACTIVOS afectados se recalibran sin esperar a la siguiente sesión:
+    - si la meta fija una competencia DM, esa competencia pasa a ser la siguiente sesión del plan;
+    - el Analista reescribe (modelo ligero, una llamada por persona) el objetivo y el porqué de las sesiones pendientes para apuntar a la meta,
+      sin cambiar semana, nivel ni competencia; sube versión/ajustes y avisa al colaborador.
+    Devuelve cuántos planes se ajustaron."""
+    m = db.meta(meta_id)
+    if not m or m.get("estado") != "activa":
+        return 0
+    hab = C.HABILIDADES.get(m["habilidad"])
+    if not hab:
+        return 0
+    if m.get("usuario_id"):
+        personas = [db.usuario(m["usuario_id"])]
+    else:
+        personas = db.usuarios(m["empresa_id"], area_id=m.get("area_id"), rol="colaborador")
+    ajustados = 0
+    for u in [p for p in personas if p][:maximo_personas]:
+        rm = db.roadmap_activo(u["id"], m["habilidad"])
+        if not rm:
+            continue
+        cambios = []
+        if m.get("competencia") and m["habilidad"] == "ruta_dm" and _priorizar_competencia_dm(u, m["competencia"], notificar=False):
+            cambios.append(f"{m['competencia']} pasa a ser tu siguiente sesión")
+            rm = db.roadmap_activo(u["id"], m["habilidad"])
+        pendientes = [it for it in rm["items"] if it["estado"] == "pendiente" and it.get("tipo") != "laboratorio"]
+        if pendientes:
+            contexto = {"habilidad": hab["nombre"], "nivel_actual": (db.nivel(u["id"], m["habilidad"]) or {}).get("nivel") or rm["nivel_inicio"],
+                        "meta_nueva": {"score_minimo": m["score_minimo"], "competencia": m.get("competencia") or "", "plazo": m.get("plazo") or "sin plazo",
+                                       "prioridad": m["prioridad"], "descripcion": m.get("descripcion") or ""},
+                        "sesiones_pendientes": [{"n": i + 1, "semana": it["semana"], "nivel": it["nivel"], "competencia": it.get("competencia") or "", "objetivo_actual": it["objetivo"]}
+                                                for i, it in enumerate(pendientes[:16])]}
+            try:
+                r = llm.generar(origen="analista.recalibrar_meta", system=P.ANALISTA_RECALIBRAR_META, contents=[{"role": "user", "text": json_compacto(contexto)}],
+                                schema=E.AJUSTE_PLAN, clase="ligero", thinking="low", max_tokens=3000, temperatura=0.4, usuario_id=u["id"])
+                items_ia = (r.json or {}).get("items") if isinstance(r.json, dict) else None
+            except (PresupuestoAgotado, ErrorLLM) as e:
+                db.log("warn", "analista", f"No se pudo recalibrar el plan de {u['email']} por la meta #{meta_id}", str(e))
+                items_ia = None
+            if items_ia:
+                n = 0
+                for it, ia in zip(pendientes[:16], items_ia):
+                    obj = str((ia or {}).get("objetivo") or "").strip()
+                    if obj and obj != it["objetivo"]:
+                        db.actualizar_item(it["id"], objetivo=obj[:300], porque=(str((ia or {}).get("porque") or "")[:300] or f"Ajustado por el Analista a la meta del líder (≥ {m['score_minimo']:.0f})"))
+                        n += 1
+                if n:
+                    cambios.append(f"{n} objetivos reescritos hacia la meta")
+        if cambios:
+            db.actualizar_roadmap(rm["id"], ajustes=int(rm.get("ajustes") or 0) + 1, version=int(rm.get("version") or 1) + 1)
+            db.notificar(u["id"], f"Tu plan de {hab['corto']} se ajustó a una meta de tu líder", f"Meta: score ≥ {m['score_minimo']:.0f}{' en ' + m['competencia'] if m.get('competencia') else ''}"
+                         f"{' para ' + m['plazo'] if m.get('plazo') else ''}. {'; '.join(cambios)}.", "/roadmaps", "aviso")
+            ajustados += 1
+    if m.get("creado_por"):
+        db.notificar(m["creado_por"], "Meta integrada a los planes", f"El Analista recalibró {ajustados} plan(es) de {hab['corto']} hacia tu meta (score ≥ {m['score_minimo']:.0f}).", "/metas", "exito")
+    db.log("info", "analista", f"Meta #{meta_id} recalibró {ajustados} planes", hab["corto"])
+    return ajustados
 
 
 # ── ascenso en la Ruta DM (propuesta → RRHH) ────────────────────────────────
@@ -373,17 +514,30 @@ def chat(u: dict, texto: str) -> dict:
     herramientas_usadas: list[str] = []
     respuesta = ""
     for _ in range(5):
-        r = llm.generar(origen="analista.chat", system=system, contents=contents, herramientas=HERRAMIENTAS, thinking="low", max_tokens=2500, temperatura=0.3, usuario_id=u["id"])
+        try:
+            r = llm.generar(origen="analista.chat", system=system, contents=contents, herramientas=HERRAMIENTAS, thinking="low", max_tokens=2500, temperatura=0.3, usuario_id=u["id"])
+        except (PresupuestoAgotado, ErrorLLM):
+            raise
+        except Exception as e:  # noqa: BLE001 — cualquier fallo del SDK se registra en la bitácora y llega como mensaje legible
+            log.exception("analista.chat")
+            db.log("error", "analista", "Fallo en el chat del Analista", f"{type(e).__name__}: {str(e)[:500]}", u.get("email", ""))
+            raise ErrorLLM(f"El Analista no pudo responder ({type(e).__name__}: {str(e)[:140]}). Revisa la bitácora e intenta de nuevo.") from e
         if not r.llamadas_funcion:
             respuesta = r.texto
             break
+        if r.contenido_modelo is not None:
+            contents.append({"model_content": r.contenido_modelo})        # turno del modelo íntegro (con thought_signature)
+        else:
+            for fc in r.llamadas_funcion:
+                contents.append({"function_call": {"name": fc["name"], "args": fc.get("args") or {}}})
+        respuestas = []
         for fc in r.llamadas_funcion:
             res = ejecutar_herramienta(u, fc["name"], fc.get("args") or {})
             herramientas_usadas.append(fc["name"])
             if fc["name"] == "investigar":
                 fuentes += res.get("fuentes", [])
-            contents.append({"function_call": {"name": fc["name"], "args": fc.get("args") or {}}})
-            contents.append({"function_response": {"name": fc["name"], "response": {"resultado": json.loads(json.dumps(res, default=str))}}})
+            respuestas.append({"name": fc["name"], "response": {"resultado": json.loads(json.dumps(res, default=str))}})
+        contents.append({"function_responses": respuestas})              # todas las respuestas en un solo turno de usuario
     else:
         respuesta = r.texto or "Consulté los datos pero no logré concluir; inténtalo con una pregunta más acotada."
     if not respuesta:
@@ -403,7 +557,15 @@ def coach_reporte(u: dict, sesion: dict, texto: str) -> dict:
     res = sesion.get("resultado") or {}
     compacto = {k: res.get(k) for k in ("resumen", "kpis", "subdimensiones", "fortalezas", "oportunidades", "brechas", "momentos_clave", "momento_clave",
                                         "plan_accion", "tips", "recomendacion", "siguiente_paso", "evidencia", "score_global_100") if res.get(k) is not None}
-    system = P.COACH_REPORTE.format(avatar=avatar, nombre=u["nombre"]) + "\nREPORTE:\n" + json_compacto(compacto)
+    system = P.COACH_REPORTE.format(avatar=avatar, nombre=u["nombre"])
+    if res.get("laboratorio"):   # coach del laboratorio: responde sólo con los materiales del taller (prioridad + dimensión más baja)
+        lab = res["laboratorio"]
+        compacto = {k: lab.get(k) for k in ("sintesis", "dimensiones", "fortalezas", "oportunidades", "momentos_clave", "recomendaciones", "prioridad", "total", "nivel")}
+        ids = [lab.get("prioridad", {}).get("dimension")] + [d["id"] for d in sorted(lab.get("dimensiones", []), key=lambda d: d["puntos"] / max(d["maximo"], 1))]
+        vistos = [i for n, i in enumerate(ids) if i in L.BASE_CONOCIMIENTO and i not in ids[:n]][:2]
+        system += ("\nEste reporte es del Laboratorio Interactivo de Habilidades para Delivery Managers. Al explicar o sugerir cómo practicar, usa ÚNICAMENTE los materiales "
+                   "del taller que se resumen abajo; no agregues modelos ni técnicas externas.\nMATERIALES:\n" + "\n\n".join(f"[{(L.dimension(i) or {}).get('nombre', i).upper()}]\n{L.BASE_CONOCIMIENTO[i]}" for i in vistos))
+    system += "\nREPORTE:\n" + json_compacto(compacto)
     hist = [m for m in ch["mensajes"] if m["rol"] in ("usuario", "coach")][-8:]
     contents = [{"role": "user" if m["rol"] == "usuario" else "model", "text": m["texto"]} for m in hist]
     if not contents or contents[-1]["text"] != texto:

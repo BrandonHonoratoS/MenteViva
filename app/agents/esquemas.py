@@ -101,6 +101,23 @@ FEEDBACK_DM = _obj({
     "plan_accion": _arr(PASO_DM, 3, 4), "tips": _arr(_s(), 3, 5),
     "siguiente_paso": _obj({"competencia": _s(), "por_que": _s()}),
 })
+TURNO_LAB = _obj({"mensaje": _s(), "accion": {"type": "string", "enum": ["avanzar", "profundizar", "fin"]}, "tension": _i(0, 100)})
+EVENTO_LAB = _obj({"titulo": _s(), "texto": _s("diálogos y nueva información que ve la persona"), "pregunta": _s("una sola pregunta abierta"),
+                   "evalua": _s("conductas a observar en silencio")})
+CASO_LAB = _obj({"titulo": _s(), "contexto": _s("2-3 líneas"), "personajes": _s("roles separados por coma"), "eventos": _arr(EVENTO_LAB, 5, 5)})
+CASOS_LAB = _obj({"casos": _arr(CASO_LAB, 2, 2)})
+DIM_LAB = _obj({"id": {"type": "string", "enum": ["escucha", "estres", "pmbok", "comunicacion"]}, "puntos": _n(0, 30),
+                "radar": {"type": "string", "enum": ["Fortalecido", "Sólido", "En desarrollo", "Requiere atención"]}, "lectura": _s("patrones observados")})
+FORTALEZA_LAB = _obj({"nombre": _s(), "evidencia": _s("qué hizo la persona"), "por_que": _s("por qué es valioso profesionalmente")})
+OPORTUNIDAD_LAB = _obj({"nombre": _s(), "observado": _s(), "riesgo": _s(), "como_fortalecer": _s(), "material": _s("práctica o modelo del material de capacitación con el que se relaciona")})
+MOMENTO_LAB = _obj({"situacion": _s(), "respuesta": _s(), "lectura": _s()})
+FEEDBACK_LAB = _obj({
+    "sintesis": _s("máximo 5 líneas"), "dimensiones": _arr(DIM_LAB, 4, 4),
+    "fortalezas": _arr(FORTALEZA_LAB, 1, 3), "oportunidades": _arr(OPORTUNIDAD_LAB, 1, 3), "momentos_clave": _arr(MOMENTO_LAB, 3, 5),
+    "recomendaciones": _arr(_s(), 3, 5),
+    "prioridad": _obj({"dimension": {"type": "string", "enum": ["escucha", "estres", "pmbok", "comunicacion"]}, "por_que": _s(), "que_practicar": _arr(_s(), 1, 3)}),
+    "cierre": _s(),
+})
 JUAN_DISENO = _obj({
     "formato": {"type": "string", "enum": ["roleplay", "caso", "reto"]}, "titulo": _s(), "encuadre": _s(), "personaje": _s(),
     "situacion": _s(), "primer_mensaje": _s(), "subdimensiones": _arr(_s(), 3, 4), "dificultad_inicial": _i(1, 5),
@@ -119,4 +136,5 @@ INVESTIGACION = _obj({"hallazgos": _arr(HALLAZGO, 1, 5), "aplicacion": _s(), "co
 
 # ── roadmaps ─────────────────────────────────────────────────────────────────
 ITEM_RM = _obj({"semana": _i(1, 12), "nivel": _s(), "competencia": _s("sólo ruta_dm; vacío en otras"), "objetivo": _s("objetivo medible de la sesión"), "porque": _s("una línea")})
+AJUSTE_PLAN = _obj({"items": _arr(_obj({"n": _i(1, 16), "objetivo": _s("objetivo medible"), "porque": _s("una línea")}), 1, 16)})
 ROADMAP = _obj({"objetivo": _s("meta del plan en una línea"), "razon": _s("por qué este orden, 2-3 líneas"), "items": _arr(ITEM_RM, 3, 16)})

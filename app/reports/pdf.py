@@ -49,6 +49,8 @@ def _pie(canvas, doc):
 def reporte_sesion(sesion: dict, usuario: dict) -> bytes:
     st = _estilos()
     res = sesion.get("resultado") or {}
+    if res.get("laboratorio"):
+        return _reporte_laboratorio(sesion, usuario, res["laboratorio"], st)
     hab = C.HABILIDADES.get(sesion["habilidad"], {})
     avatar = AVATARES.get(sesion["agente"], {})
     buf = BytesIO()
@@ -110,6 +112,50 @@ def reporte_sesion(sesion: dict, usuario: dict) -> bytes:
                             + f"<br/><i>{_esc(reco.get('razon') or reco.get('por_que'))}</i>", st["p"]))
     if res.get("pregunta_para_llevarse"):
         el += [Spacer(1, 6), HRFlowable(width="100%", color=AQUA), Paragraph(f"<i>Pregunta para llevarte: {_esc(res['pregunta_para_llevarse'])}</i>", st["p"])]
+    doc.build(el, onFirstPage=_pie, onLaterPages=_pie)
+    return buf.getvalue()
+
+
+def _reporte_laboratorio(sesion: dict, usuario: dict, lab: dict, st) -> bytes:
+    """Reporte de retroalimentación del Laboratorio DM (10 secciones del documento)."""
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=letter, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=20 * mm, bottomMargin=20 * mm,
+                            title=f"Mente Viva · Laboratorio DM #{sesion['id']}")
+    el = [Paragraph("Laboratorio Interactivo de Habilidades para Delivery Managers · Reporte de retroalimentación", st["h1"]),
+          Paragraph(f"{_esc(usuario['nombre'])} · Ruta DM nivel {_esc(sesion.get('nivel'))} · {_esc(sesion['inicio'][:10])} · evaluador: Juan Artiaga · "
+                    f"{'casos nuevos (checkpoint)' if lab.get('variante') == 'generada' else 'casos originales'}", st["meta"]), Spacer(1, 6)]
+    el.append(Table([[Paragraph(f"<b>1. Resultado global</b><br/><font size=22 color='#6D28D9'>{lab.get('total', 0):.0f}</font><font size=9>/100</font>", st["p"]),
+                      Paragraph(f"<b>Nivel</b><br/>{_esc(lab.get('nivel'))}<br/><font size=8>{_esc(lab.get('nivel_descripcion'))}</font>", st["p"])]],
+                    colWidths=[45 * mm, 135 * mm], style=TableStyle([("BACKGROUND", (0, 0), (-1, -1), SUAVE), ("BOX", (0, 0), (-1, -1), 0.5, AQUA),
+                                                                     ("VALIGN", (0, 0), (-1, -1), "TOP"), ("PADDING", (0, 0), (-1, -1), 8)])))
+    el += [Spacer(1, 6), Paragraph(_esc(lab.get("sintesis")), st["p"]), Paragraph("2. Resultado por competencia · 3. Radar cualitativo", st["h2"])]
+    filas = [["Dimensión", "Puntos", "Radar"]] + [[Paragraph(_esc(d["nombre"]), st["p"]), Paragraph(f"{d['puntos']:.0f}/{d['maximo']}", st["chip"]), Paragraph(_esc(d["radar"]), st["p"])]
+                                                 for d in lab.get("dimensiones", [])]
+    filas.append([Paragraph("<b>TOTAL</b>", st["p"]), Paragraph(f"<b>{lab.get('total', 0):.0f}/100</b>", st["chip"]), Paragraph("", st["p"])])
+    el.append(Table(filas, colWidths=[100 * mm, 30 * mm, 50 * mm], style=_tabla()))
+    el.append(Paragraph("4. Tus 3 principales fortalezas", st["h2"]))
+    for i, f in enumerate(lab.get("fortalezas", []), 1):
+        el.append(Paragraph(f"<b>Fortaleza {i} — {_esc(f.get('nombre'))}</b><br/><b>Evidencia observada:</b> {_esc(f.get('evidencia'))}<br/><b>Por qué es valioso:</b> {_esc(f.get('por_que'))}", st["p"]))
+        el.append(Spacer(1, 3))
+    el.append(Paragraph("5. Tus 3 principales oportunidades de desarrollo", st["h2"]))
+    for i, o in enumerate(lab.get("oportunidades", []), 1):
+        el.append(Paragraph(f"<b>Oportunidad {i} — {_esc(o.get('nombre'))}</b><br/><b>Lo observado:</b> {_esc(o.get('observado'))}<br/><b>Riesgo potencial:</b> {_esc(o.get('riesgo'))}"
+                            f"<br/><b>Cómo fortalecerlo:</b> {_esc(o.get('como_fortalecer'))}" + (f"<br/><i>Material: {_esc(o.get('material'))}</i>" if o.get("material") else ""), st["p"]))
+        el.append(Spacer(1, 3))
+    el.append(Paragraph("6. Momentos clave de la simulación", st["h2"]))
+    for m in lab.get("momentos_clave", []):
+        el.append(Paragraph(f"<b>Situación:</b> {_esc(m.get('situacion'))}<br/><b>Tu respuesta:</b> {_esc(m.get('respuesta'))}<br/><b>Lectura del evaluador:</b> {_esc(m.get('lectura'))}", st["p"]))
+        el.append(Spacer(1, 3))
+    el.append(Paragraph("7. Lectura por habilidad", st["h2"]))
+    for d in lab.get("dimensiones", []):
+        el.append(Paragraph(f"<b>{_esc(d['nombre'])}</b> — {_esc(d.get('lectura'))}", st["p"]))
+    el.append(Paragraph("8. Recomendaciones prácticas", st["h2"]))
+    for i, t in enumerate(lab.get("recomendaciones", []), 1):
+        el.append(Paragraph(f"<b>{i}.</b> {_esc(t)}", st["p"]))
+    pr = lab.get("prioridad") or {}
+    el += [Paragraph("9. Prioridad de desarrollo", st["h2"]),
+           Paragraph(f"<b>{_esc(pr.get('nombre'))}</b><br/><b>Por qué:</b> {_esc(pr.get('por_que'))}<br/><b>Qué practicar:</b> " + "; ".join(_esc(q) for q in pr.get("que_practicar", [])), st["p"]),
+           Paragraph("10. Cierre", st["h2"]), Paragraph(_esc(lab.get("cierre")), st["p"])]
     doc.build(el, onFirstPage=_pie, onLaterPages=_pie)
     return buf.getvalue()
 

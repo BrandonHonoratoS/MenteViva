@@ -62,3 +62,11 @@ En tu computadora, con la misma key: `pip install -r requirements.txt` y `python
 3. Diagnóstico completo con Elena (real) → `/mi-diagnostico` con competencias y planes.
 4. Una sesión con Celeste y una con Juan → reportes con score, KPIs y evidencia; lectura del Analista visible en la ficha para el director.
 5. `/admin/uso` refleja el costo (≈ 0.05–0.15 MXN por turno, 1–2 MXN por sesión).
+
+
+## Actualizaciones sin perder datos
+
+- La base vive en `DATA_DIR/mente_viva.db` (en Render: disco montado en `/data` + variable `DATA_DIR=/data`). Un deploy sólo reemplaza el código: el disco no se toca.
+- Al arrancar, la plataforma crea tablas **sólo si no existen** y el superadmin / empresa inicial **sólo si la base está vacía**; nunca sobreescribe contraseñas ni registros aunque cambien las variables de entorno. La prueba `tests/test_actualizacion.py` arranca una versión nueva sobre una base con datos y comprueba usuarios, contraseñas, sesiones y conteos.
+- Comprobación en producción: Admin → **Datos y respaldo** muestra la ruta de la base, si el disco es persistente, los conteos y la versión en ejecución; el log de arranque imprime lo mismo (`… 1 empresas · 12 usuarios activos · 40 sesiones · disco persistente`). Si dice **TEMPORAL**, falta el disco o `DATA_DIR`.
+- Antes de cada deploy: Admin → **Descargar respaldo (.db)**. Render además toma un snapshot diario del disco (7 días). Para restaurar, copia el archivo a `/data/mente_viva.db` con el servicio detenido (Render → Shell) y reinicia.

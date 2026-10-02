@@ -31,7 +31,7 @@ def _f(key: str, default: float) -> float:
 class Settings:
     APP_NAME = "Mente Viva"
     TAGLINE = "Crece desde adentro, impacta hacia afuera"
-    VERSION = "1.0.3"
+    VERSION = "1.1.4"
 
     def __init__(self) -> None:
         self.APP_ENV = os.getenv("APP_ENV", "development")

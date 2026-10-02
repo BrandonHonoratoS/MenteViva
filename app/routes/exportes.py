@@ -14,7 +14,7 @@ router = APIRouter()
 @router.get("/sesion/{sid}/reporte.pdf")
 def sesion_pdf(sid: int, u: dict = Depends(requiere_usuario)):
     s = db.sesion(sid)
-    if not s or s["estado"] != "completada" or s["tipo"] != "practica" or not puede_ver_usuario(u, db.usuario(s["usuario_id"])):
+    if not s or s["estado"] != "completada" or s["tipo"] not in ("practica", "laboratorio") or not puede_ver_usuario(u, db.usuario(s["usuario_id"])):
         raise HTTPException(404, "Reporte no disponible")
     datos = pdf.reporte_sesion(s, db.usuario(s["usuario_id"]))
     db.log("info", "exportes", f"PDF sesión {sid}", "", u["email"])

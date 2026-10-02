@@ -1,10 +1,11 @@
-{% extends "base.html" %}{% block title %}Reporte de sesión{% endblock %}
-{% block subtitulo %}{{ hab.nombre }} · nivel {{ s.nivel }}{% if s.competencia %} · {{ s.competencia }}{% endif %} · {{ s.inicio|fecha }} · {{ minutos }} min · {{ s.turnos }} turnos{% if not propia %} · {{ s.usuario_nombre }}{% endif %}{% endblock %}
+{% extends "base.html" %}{% block title %}{{ 'Reporte del Laboratorio DM' if res.laboratorio else 'Reporte de sesión' }}{% endblock %}
+{% block subtitulo %}{{ 'Laboratorio DM' if res.laboratorio else hab.nombre }} · nivel {{ s.nivel }}{% if s.competencia %} · {{ s.competencia }}{% endif %} · {{ s.inicio|fecha }} · {{ minutos }} min · {{ s.turnos }} turnos{% if not propia %} · {{ s.usuario_nombre }}{% endif %}{% endblock %}
 {% block acciones %}<a class="btn sm" href="/sesion/{{ s.id }}/reporte.pdf">{{ m.icon('download') }} PDF</a>{% endblock %}
 {% block content %}
 {% set reco = res.recomendacion or res.siguiente_paso or {} %}
 <div class="grid g-2-1">
   <div class="stack">
+    {% if res.laboratorio %}{% include "_reporte_lab.html" %}{% else %}
     <div class="card hero">
       <div class="row" style="gap:26px">
         <div class="orb-wrap"><div class="orb" style="--c1:{{ avatar.color }};--c2:#06B6D4"></div><b>{{ avatar.nombre }}</b><span class="muted tiny">modo coach</span></div>
@@ -83,13 +84,22 @@
     <div class="card"><details><summary>Transcripción completa ({{ mensajes|length }} mensajes)</summary>
       <div class="msgs mt" style="max-height:420px">{% for msg in mensajes %}{% if msg.rol in ('usuario','avatar') %}<div class="msg {{ msg.rol }}"><span class="who">{{ 'Tú' if msg.rol == 'usuario' and propia else (s.usuario_nombre if msg.rol == 'usuario' else avatar.nombre) }}</span>{{ msg.texto }}</div>{% endif %}{% endfor %}</div></details></div>
     {% endif %}
+    {% endif %}
   </div>
 
   <div class="stack">
     <div class="card dark">
+      {% if res.laboratorio %}
+      <div class="cap" style="color:rgba(255,255,255,.6)">Prioridad de desarrollo</div>
+      <h2 style="color:#fff">{{ res.laboratorio.prioridad.nombre }}</h2>
+      <p class="muted">{{ res.laboratorio.prioridad.por_que }}</p>
+      <div class="cap" style="color:rgba(255,255,255,.6)">Qué practicar</div>
+      {% for q in res.laboratorio.prioridad.que_practicar %}<div class="row mt" style="gap:10px;align-items:flex-start;margin-top:8px;flex-wrap:nowrap"><span class="chip" style="background:rgba(255,255,255,.15);color:#fff;flex:none">{{ loop.index }}</span><span class="small" style="color:#fff">{{ q }}</span></div>{% endfor %}
+      {% else %}
       <div class="cap" style="color:rgba(255,255,255,.6)">Siguiente paso</div>
       <h2 style="color:#fff">{{ reco.objetivo_siguiente or reco.competencia or '—' }}</h2>
       <p class="muted">{{ reco.razon or reco.por_que }}</p>
+      {% endif %}
       {% if reco.nivel_sugerido %}<span class="chip" style="background:rgba(255,255,255,.15);color:#fff">nivel sugerido: {{ reco.nivel_sugerido }}</span>{% endif %}
       {% if propia and siguiente %}<a class="btn mt block" style="background:#fff" href="/entrenar/{{ siguiente.habilidad }}?item={{ siguiente.id }}">Preparar mi siguiente sesión →</a>{% endif %}
     </div>
@@ -103,7 +113,7 @@
       <h2>Pregúntale a {{ avatar.nombre.split(' ')[0] }}</h2><p class="muted small">Sobre tu retroalimentación: qué significa un score, cómo practicar una técnica, cómo preparar la siguiente sesión.</p>
       <div data-chat="/api/reporte/{{ s.id }}/chat" data-quien="{{ avatar.nombre }}">
         <div class="msgs" style="max-height:320px;min-height:120px">{% for msg in chat.mensajes %}<div class="msg {{ 'usuario' if msg.rol == 'usuario' else 'avatar' }}"><span class="who">{{ 'Tú' if msg.rol == 'usuario' else avatar.nombre }}</span>{{ msg.texto }}</div>{% endfor %}</div>
-        <div class="composer"><textarea placeholder="¿Cómo puedo mejorar mi KPI-2?"></textarea><button class="btn primary enviar" type="button">Enviar</button></div>
+        <div class="composer"><textarea placeholder="{{ '¿Cómo sostengo la incertidumbre sin prometer de más?' if res.laboratorio else '¿Cómo puedo mejorar mi KPI-2?' }}"></textarea><button class="btn primary enviar" type="button">Enviar</button></div>
       </div>
     </div>
     {% endif %}

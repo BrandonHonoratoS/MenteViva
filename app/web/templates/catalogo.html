@@ -10,7 +10,7 @@
     <div class="row between"><b>{{ h.nombre }}</b>{% if h.personalizada %}<span class="chip aqua">personalizado · {{ h.empresa }}</span>{% endif %}</div>
     <div class="muted small">{{ cat.nombre }} · con {{ av.nombre }} ({{ h.rol_avatar }})</div>
     <p class="small">{{ h.descripcion }}</p>
-    <div class="row between mt"><span>{{ m.nivel_badge(niveles, h.id) }}</span>{% if perfil.estado == 'completo' and not en_curso %}<a class="btn primary sm" href="/entrenar/{{ h.id }}">Entrenar</a>{% endif %}</div>
+    <div class="row between mt"><span>{{ m.nivel_badge(niveles, h.id) }}</span>{% if perfil.estado == 'completo' and not en_curso %}<span class="row" style="gap:6px">{% if h.id == 'ruta_dm' %}<a class="btn sm" href="/laboratorio" title="Laboratorio Interactivo de Habilidades para Delivery Managers">🧪 Laboratorio DM</a>{% endif %}<a class="btn primary sm" href="/entrenar/{{ h.id }}">Entrenar</a></span>{% endif %}</div>
   </div>
 </div>
 {% endfor %}

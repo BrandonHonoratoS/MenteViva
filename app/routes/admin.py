@@ -4,7 +4,7 @@ from __future__ import annotations
 import secrets
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 
 from .. import db
 from ..agents import catalogo as C
@@ -25,7 +25,16 @@ def admin(request: Request, u: dict = Depends(sa), ok: str = "", error: str = ""
                           "api_key": bool(settings.GEMINI_API_KEY), "precios": settings.PRICE_TABLE},
                   presupuesto_full=db.presupuesto(), ok=ok, error=error, clave=clave, superadmins=db.usuarios(rol="superadmin", activos=None),
                   rrhh_por_empresa={e["id"]: [x for x in db.usuarios(e["id"], activos=None) if x["rol"] in ("rrhh", "dg")] for e in db.empresas()},
-                  password_min=settings.PASSWORD_MIN)
+                  password_min=settings.PASSWORD_MIN, datos=db.estado_datos())
+
+
+@router.get("/respaldo.db")
+def respaldo(u: dict = Depends(sa)):
+    """Descarga una copia consistente de la base (todas las empresas, usuarios, sesiones y análisis)."""
+    datos = db.respaldo_bytes()
+    db.log("info", "sistema", "Respaldo de la base descargado", f"{len(datos) // 1024} KB", u["email"])
+    return Response(datos, media_type="application/octet-stream",
+                    headers={"Content-Disposition": f'attachment; filename="menteviva_respaldo_{db.now()[:10]}.db"'})
 
 
 @router.post("/empresas")

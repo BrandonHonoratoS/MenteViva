@@ -297,3 +297,17 @@ def duracion_min(habilidad_id: str, nivel: str | None) -> int:
     h = HABILIDADES.get(habilidad_id) or {}
     d = h.get("duracion", {})
     return int(d.get(nivel or "", d.get("*", 20)))
+
+
+def turnos_max_sesion(sesion: dict) -> int:
+    if sesion.get("tipo") == "laboratorio":
+        from .laboratorio import TURNOS_MAX
+        return TURNOS_MAX
+    return turnos_max(sesion["habilidad"], sesion.get("nivel"))
+
+
+def duracion_sesion(sesion: dict) -> int:
+    if sesion.get("tipo") == "laboratorio":
+        from .laboratorio import DURACION_MIN
+        return DURACION_MIN
+    return duracion_min(sesion["habilidad"], sesion.get("nivel"))

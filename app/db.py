@@ -15,6 +15,7 @@ import threading
 import time
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Iterable
 
 from .config import settings
@@ -351,6 +352,48 @@ def init_db() -> None:
     log("info", "sistema", "Base de datos lista", str(settings.DB_PATH))
 
 
+def estado_datos() -> dict:
+    """Radiografía de la base para el superadmin: dónde vive, si el disco es persistente y cuántos registros hay."""
+    import os
+    ruta = settings.DB_PATH
+    persistente = str(settings.DATA_DIR).startswith("/data") or os.getenv("DATA_DIR", "") not in ("", str(Path.cwd() / "data"))
+    with conn() as con:
+        conteos = {t: con.execute(f"SELECT COUNT(*) c FROM {t}").fetchone()["c"] for t in ("empresas", "usuarios", "sesiones", "roadmaps", "mensajes", "analisis")}
+        activos = con.execute("SELECT COUNT(*) c FROM usuarios WHERE activo=1").fetchone()["c"]
+    try:
+        tam = os.path.getsize(ruta)
+        mod = datetime.fromtimestamp(os.path.getmtime(ruta), tz=timezone.utc).isoformat(timespec="seconds")
+    except OSError:
+        tam, mod = 0, None
+    return {"ruta": str(ruta), "data_dir": str(settings.DATA_DIR), "persistente": persistente, "tamano_kb": round(tam / 1024, 1), "modificada": mod,
+            "conteos": conteos, "usuarios_activos": activos, "version": settings.VERSION}
+
+
+def respaldo_bytes() -> bytes:
+    """Copia consistente de la base como archivo .db (API de respaldo de SQLite: segura con WAL y usuarios conectados).
+    Para restaurar basta copiar el archivo a DATA_DIR/mente_viva.db con el servicio detenido."""
+    import os
+    import tempfile
+    fd, tmp = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    try:
+        destino = sqlite3.connect(tmp)
+        with _LOCK:
+            origen = sqlite3.connect(str(settings.DB_PATH))
+            try:
+                origen.backup(destino)
+            finally:
+                origen.close()
+        destino.close()
+        with open(tmp, "rb") as f:
+            return f.read()
+    finally:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+
+
 # ── usuarios y autenticación ─────────────────────────────────────────────────
 def _hash(password: str, salt: str) -> str:
     return hashlib.scrypt(password.encode(), salt=salt.encode(), n=2 ** 14, r=8, p=1).hex()
@@ -685,6 +728,17 @@ def insertar_item(roadmap_id: int, despues_de_orden: int, item: dict) -> int:
         return iid
 
 
+def intercambiar_items(a_id: int, b_id: int) -> None:
+    """Intercambia orden y semana de dos ítems del mismo roadmap (reordenar prioridades sin recrear el plan)."""
+    with conn() as con:
+        a = _row(con.execute("SELECT id, roadmap_id, orden, semana FROM roadmap_items WHERE id=?", (a_id,)).fetchone())
+        b = _row(con.execute("SELECT id, roadmap_id, orden, semana FROM roadmap_items WHERE id=?", (b_id,)).fetchone())
+        if not a or not b or a["roadmap_id"] != b["roadmap_id"]:
+            return
+        con.execute("UPDATE roadmap_items SET orden=?, semana=? WHERE id=?", (b["orden"], b["semana"], a_id))
+        con.execute("UPDATE roadmap_items SET orden=?, semana=? WHERE id=?", (a["orden"], a["semana"], b_id))
+
+
 def actualizar_roadmap(id_: int, **campos) -> None:
     permitidos = {"estado", "objetivo", "razon", "aprobado_por", "ajustes", "version"}
     campos = {k: v for k, v in campos.items() if k in permitidos}
@@ -815,6 +869,11 @@ def metas(empresa_id: int, area_id: int | None = None, usuario_id: int | None = 
     q += " ORDER BY m.prioridad='alta' DESC, m.plazo"
     with conn() as con:
         return _rows(con.execute(q, args))
+
+
+def meta(id_: int) -> dict | None:
+    with conn() as con:
+        return _row(con.execute("SELECT * FROM metas WHERE id=?", (id_,)).fetchone())
 
 
 def cerrar_meta(id_: int, estado: str = "cerrada") -> None:

@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import secrets
+import threading
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 from .. import db, metrics
+from ..config import settings
 from ..agents import analista
 from ..agents import catalogo as C
 from ..security import alcance_usuarios, requiere_rol, verificar_csrf
@@ -168,9 +170,14 @@ def meta_crear(request: Request, u: dict = Depends(rrhh_o_director), csrf: str =
         area_id = u.get("area_id") or 0
         if usuario_id and not any(x["id"] == usuario_id for x in alcance_usuarios(u)):
             raise HTTPException(403, "Ese colaborador no está en tu área")
-    db.crear_meta(u["empresa_id"], habilidad, u["id"], area_id or None, usuario_id or None, competencia.strip()[:80], max(0, min(100, score_minimo)), plazo or None,
-                  prioridad if prioridad in ("alta", "media", "baja") else "media", descripcion.strip()[:400])
+    mid = db.crear_meta(u["empresa_id"], habilidad, u["id"], area_id or None, usuario_id or None, competencia.strip()[:80], max(0, min(100, score_minimo)), plazo or None,
+                        prioridad if prioridad in ("alta", "media", "baja") else "media", descripcion.strip()[:400])
     db.log("info", "metas", f"Meta creada: {habilidad} ≥ {score_minimo}", descripcion[:100], u["email"])
+    # el Analista recalibra en segundo plano los planes activos afectados (sin esperar a la siguiente sesión)
+    if settings.ANALISIS_SINCRONO:
+        analista.recalibrar_por_meta(mid)
+    else:
+        threading.Thread(target=analista.recalibrar_por_meta, args=(mid,), daemon=True, name=f"meta-{mid}").start()
     return RedirectResponse("/metas?ok=1", status_code=303)
 
 

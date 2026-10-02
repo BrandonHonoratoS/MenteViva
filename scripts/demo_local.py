@@ -140,6 +140,31 @@ gemini.STUB_OVERRIDES["analista.resumen"] = {"titulo": "Semana con avance sosten
                                                                   {"accion": "Registrar evaluación del líder del periodo", "responsable": "Directores", "senal_exito": "100 % evaluados", "prioridad": "media"},
                                                                   {"accion": "Meta de KPI-1 ≥ 75 para el equipo comercial", "responsable": "RRHH", "senal_exito": "Meta activa", "prioridad": "media"}]}
 
+def feedback_lab(base100):
+    f = min(1.0, max(0.45, base100 / 100))
+    pts = [round(30 * f), round(25 * (f - .1)), round(25 * f), round(20 * (f + .05))]
+    radar = lambda p, m: "Fortalecido" if p / m >= .9 else "Sólido" if p / m >= .75 else "En desarrollo" if p / m >= .6 else "Requiere atención"
+    ids = ["escucha", "estres", "pmbok", "comunicacion"]
+    lect = {"escucha": "Pregunta y parafrasea antes de comprometer; cierra acuerdos con responsable y fecha.",
+            "estres": "Bajo presión del cliente tiende a prometer fechas sin evidencia; recupera el control al pedir datos.",
+            "pmbok": "Separa hechos de supuestos y controla cambios de alcance; le falta formalizar el seguimiento.",
+            "comunicacion": "Mensajes ejecutivos claros en tres ideas con siguiente paso explícito."}
+    return {"sintesis": "Escucha y comunica con estructura; su principal riesgo es comprometerse bajo presión antes de validar evidencia.",
+            "dimensiones": [{"id": i, "puntos": max(0, p), "radar": radar(max(0, p), m), "lectura": lect[i]} for i, p, m in zip(ids, pts, (30, 25, 25, 20))],
+            "fortalezas": [{"nombre": "Investigación antes de decidir", "evidencia": "Pidió a QA el estado real de las pruebas antes de responder al cliente.", "por_que": "Evita comprometer decisiones sin información."},
+                           {"nombre": "Comunicación ejecutiva", "evidencia": "Al CIO le dio situación, impacto y propuesta en tres frases.", "por_que": "Los directivos deciden con mensajes breves y estructurados."},
+                           {"nombre": "Cierre de acuerdos", "evidencia": "Fijó responsable y hora de seguimiento tras el riesgo oculto.", "por_que": "Convierte la conversación en acción."}],
+            "oportunidades": [{"nombre": "Sostener la incertidumbre", "observado": "Ante el '¿sí o no?' respondió 'sí salimos' sin condiciones.", "riesgo": "El cliente usará esa promesa después.", "como_fortalecer": "Responder con condiciones verificables y un checkpoint con hora."},
+                              {"nombre": "Fatiga del equipo", "observado": "No redistribuyó la carga del desarrollador con once horas conectado.", "riesgo": "Decisiones de menor calidad en el incidente.", "como_fortalecer": "Relevar y asignar la revisión a otra persona."},
+                              {"nombre": "Ausencia de culpabilización", "observado": "Señaló al desarrollador al conocer la falla.", "riesgo": "Defensividad y menos información.", "como_fortalecer": "Hablar de hechos y de siguientes pasos, no de culpables."}],
+            "momentos_clave": [{"situacion": "Presión del cliente por una respuesta sí/no", "respuesta": "Prometió el viernes", "lectura": "Manejo de presión en desarrollo"},
+                               {"situacion": "Riesgo oculto revelado por el líder técnico", "respuesta": "Pidió reproducir la falla y fijó responsable", "lectura": "Orientación a evidencia"},
+                               {"situacion": "CIO con 90 segundos", "respuesta": "Tres ideas y siguiente paso", "lectura": "Comunicación ejecutiva"}],
+            "recomendaciones": ["Antes de responder sí/no, enumera lo que falta por validar y cuándo lo sabrás.", "Define un checkpoint con hora en cada compromiso.", "Cuando alguien lleve más de diez horas, redistribuye la carga explícitamente."],
+            "prioridad": {"dimension": "estres", "por_que": "Las promesas bajo presión son el mayor riesgo para el proyecto y el equipo.", "que_practicar": ["Sostener incertidumbre con un plan y fecha de respuesta", "Pausar y pedir datos antes de responder"]},
+            "cierre": "Tienes base sólida de escucha y comunicación; el siguiente paso es decidir con evidencia cuando el cliente presiona."}
+
+
 def _retrodatar(sid, dias):
     t = (datetime.now(timezone.utc) - timedelta(days=dias, minutes=random.randint(0, 600))).isoformat(timespec="seconds")
     with db.conn() as con:
@@ -167,6 +192,17 @@ for u in colabs:
     motor.terminar(db.sesion(s["id"]), db.usuario(u["id"]), en_hilo=False)
     _retrodatar(s["id"], 40)
     gemini.STUB_OVERRIDES.pop("elena.turno", None)
+    # laboratorio DM (punto de partida de la Ruta DM)
+    gemini.STUB_OVERRIDES["juan.laboratorio"] = {"mensaje": "El cliente escucha tu respuesta y contesta con impaciencia.", "accion": "avanzar", "tension": random.randint(40, 80)}
+    gemini.STUB_OVERRIDES["juan.lab_feedback"] = feedback_lab(base + 8)
+    lab = motor.iniciar(db.usuario(u["id"]), "ruta_dm", item=db.siguiente_item(u["id"], "ruta_dm"), tipo="laboratorio")
+    motor.turno(db.sesion(lab["id"]), db.usuario(u["id"]), "Estoy listo, comencemos.")
+    for t in range(10):
+        motor.turno(db.sesion(lab["id"]), db.usuario(u["id"]), random.choice(["Antes de comprometer una fecha quiero saber qué falta en pruebas. QA, ¿qué flujos quedan?",
+                                                                               "Primero evidencia: DBA, ¿qué muestran los procesos? Nadie busca culpables ahora.",
+                                                                               "Situación: el despliegue coincidió con la lentitud; impacto: usuarios sin operar; propongo revertir y checkpoint a las 7."]))
+    motor.terminar(db.sesion(lab["id"]), db.usuario(u["id"]), en_hilo=False)
+    _retrodatar(lab["id"], 38)
     # sesiones de práctica retrodatadas
     n_ses = random.randint(4, 8)
     for k in range(n_ses):

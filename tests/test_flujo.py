@@ -94,7 +94,8 @@ def test_03_diagnostico_elena_y_roadmaps(client, stub):
     assert habs["ventas"]["estado"] == "activo" and habs["ruta_dm"]["estado"] == "activo"
     assert habs["entrevistas"]["estado"] == "propuesto"   # no forma parte del rol → RRHH decide
     assert habs["ventas"]["horizonte_semanas"] == 8 and habs["ventas"]["total"] >= 3
-    assert all(it["competencia"] in C.competencias_dm("DM2") for it in habs["ruta_dm"]["items"])
+    assert all(it["competencia"] in C.competencias_dm("DM2") for it in habs["ruta_dm"]["items"] if it["tipo"] != "laboratorio")
+    assert habs["ruta_dm"]["items"][0]["tipo"] == "laboratorio"   # la Ruta DM arranca con el Laboratorio DM
     assert carlos.get("/mi-diagnostico").status_code == 200
     assert carlos.get("/roadmaps").status_code == 200
     props = db.propuestas(carlos.u["empresa_id"], tipo="roadmap")
@@ -197,7 +198,7 @@ def test_06_juan_artiaga_y_ascenso_dm(client, stub):
     assert r.status_code == 303
     assert db.nivel(uid, "ruta_dm")["nivel"] == "DM2"
     rm = db.roadmap_activo(uid, "ruta_dm")
-    assert rm and all(it["competencia"] in C.competencias_dm("DM3") for it in rm["items"])
+    assert rm and all(it["competencia"] in C.competencias_dm("DM3") for it in rm["items"] if it["tipo"] != "laboratorio")
     # aprobar roadmap propuesto de entrevistas
     r = rrhh.post(f"/aprobaciones/{ESTADO['prop_roadmap']}", {"decision": "aprobada"})
     assert db.roadmaps(uid, ("activo",)) and any(x["habilidad"] == "entrevistas" for x in db.roadmaps(uid, ("activo",)))

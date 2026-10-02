@@ -144,6 +144,52 @@ def feedback_dm(js: dict | None, sesion: dict) -> dict:
     }
 
 
+def feedback_laboratorio(js: dict | None, sesion: dict) -> dict:
+    """Reporte del Laboratorio DM: 4 dimensiones (30/25/25/20), total /100, nivel de dominio y las 10 secciones del documento.
+
+    Además de la estructura propia (clave 'laboratorio'), rellena las claves genéricas (resumen, fortalezas, plan_accion, tips, siguiente_paso)
+    para que el Analista, el PDF y el chat del coach funcionen sin casos especiales.
+    """
+    from . import laboratorio as L
+    js = js if isinstance(js, dict) else {}
+    por_id = {d.get("id"): d for d in _lista(js.get("dimensiones")) if isinstance(d, dict)}
+    dims = []
+    for d in L.DIMENSIONES:
+        x = por_id.get(d["id"]) or {}
+        pts = round(_num(x.get("puntos"), 0, d["puntos"]), 1)
+        dims.append({"id": d["id"], "nombre": d["nombre"], "corto": d.get("corto", d["nombre"]), "puntos": pts, "maximo": d["puntos"], "score10": round(pts / d["puntos"] * 10, 1),
+                     "radar": x.get("radar") if x.get("radar") in L.RADAR else _radar_por_pct(pts / d["puntos"]),
+                     "lectura": _texto(x.get("lectura"), "Sin lectura registrada.")})
+    total, nivel, nivel_desc = L.puntaje(dims)
+    pr = js.get("prioridad") if isinstance(js.get("prioridad"), dict) else {}
+    peor = min(dims, key=lambda d: d["puntos"] / d["maximo"])
+    prio_id = pr.get("dimension") if pr.get("dimension") in L.DIM_IDS else peor["id"]
+    prio_dim = L.dimension(prio_id) or peor
+    que_practicar = [str(t) for t in _lista(pr.get("que_practicar")) if str(t).strip()][:3] or [f"Practicar {prio_dim['nombre'].lower()} en tu siguiente sesión con Juan."]
+    fortalezas = _items(js.get("fortalezas"), {"nombre": "Fortaleza", "evidencia": "", "por_que": ""}, 3)
+    oportunidades = _items(js.get("oportunidades"), {"nombre": "Oportunidad", "observado": "", "riesgo": "", "como_fortalecer": "", "material": ""}, 3)
+    momentos = _items(js.get("momentos_clave"), {"situacion": "", "respuesta": "", "lectura": ""}, 5)
+    recomendaciones = [str(t) for t in _lista(js.get("recomendaciones")) if str(t).strip()][:5]
+    lab = {"dimensiones": dims, "total": total, "nivel": nivel, "nivel_descripcion": nivel_desc, "sintesis": _texto(js.get("sintesis"), "Laboratorio analizado."),
+           "fortalezas": fortalezas, "oportunidades": oportunidades, "momentos_clave": momentos, "recomendaciones": recomendaciones,
+           "prioridad": {"dimension": prio_id, "nombre": prio_dim["nombre"], "por_que": _texto(pr.get("por_que")), "que_practicar": que_practicar},
+           "cierre": _texto(js.get("cierre")), "variante": (sesion.get("escenario") or {}).get("variante", "fija")}
+    comp_prioridad = (prio_dim.get("competencias_dm") or [""])[0]
+    return {
+        "laboratorio": lab, "resumen": lab["sintesis"], "score_global": round(total / 10, 1), "nivel_dominio": nivel,
+        "subdimensiones": [{"nombre": d["nombre"], "score": d["score10"], "evidencia": d["lectura"]} for d in dims],
+        "fortalezas": [{"habilidad": f["nombre"], "evidencia": f["evidencia"], "por_que_importa": f["por_que"]} for f in fortalezas],
+        "oportunidades": [{"habilidad": o["nombre"], "evidencia": o["observado"], "impacto": o["riesgo"], "micro_practica": o["como_fortalecer"]} for o in oportunidades],
+        "plan_accion": [{"paso": p, "como_practicar_esta_semana": "", "senal_de_logro": ""} for p in que_practicar],
+        "tips": recomendaciones, "siguiente_paso": {"competencia": comp_prioridad, "por_que": lab["prioridad"]["por_que"]},
+        "recomendacion": {"objetivo_siguiente": f"Prioridad del laboratorio: {prio_dim['nombre']} — {que_practicar[0]}"[:300], "razon": lab["prioridad"]["por_que"]},
+    }
+
+
+def _radar_por_pct(p: float) -> str:
+    return "Fortalecido" if p >= 0.9 else "Sólido" if p >= 0.75 else "En desarrollo" if p >= 0.6 else "Requiere atención"
+
+
 def diseno_juan(js: dict | None, sesion: dict) -> dict:
     js = js if isinstance(js, dict) else {}
     comp = sesion.get("competencia") or "la competencia"
