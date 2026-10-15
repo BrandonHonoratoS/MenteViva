@@ -23,7 +23,7 @@
 <div class="grid g-2-1">
   <div class="stack">
     {% if en_curso %}
-    <div class="card hero"><div class="row between"><div><span class="chip amber">Sesión en curso</span><h2 style="margin-top:8px">Tienes una práctica abierta</h2><p class="muted">{{ en_curso.habilidad|hab }} · {{ en_curso.nivel }}</p></div><a class="btn primary" href="/sesion/{{ en_curso.id }}">Continuar</a></div></div>
+    {% include "_en_curso.html" %}
     {% elif siguiente %}
     <div class="card hero">
       <div class="row" style="gap:22px">

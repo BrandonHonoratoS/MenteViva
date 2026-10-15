@@ -48,5 +48,5 @@
 {%- endmacro %}
 
 {% macro nivel_badge(niveles, h) -%}
-{% if niveles.get(h) %}<span class="badge-level">{{ niveles[h].nivel }}</span>{% else %}<span class="chip gris">sin nivel</span>{% endif %}
+{% if niveles.get(h) %}<span class="badge-level">{{ niveles[h].nivel }}</span>{% else %}<span class="chip aqua">nuevo · tu nivel se define en la 1.ª sesión</span>{% endif %}
 {%- endmacro %}

@@ -44,6 +44,8 @@
     </div>
     {% if propia and s.estado == 'en_curso' %}
     <div class="row"><button class="btn" id="terminar" type="button">Terminar y analizar</button><button class="btn ghost sm" id="descartar" type="button">Descartar</button></div>
+    {% elif propia and s.estado in ('analizando', 'error') %}
+    <div class="row"><button class="btn ghost sm" id="descartar" type="button">Descartar esta sesión</button></div>
     {% endif %}
   </aside>
   <section class="card panel">

@@ -26,6 +26,8 @@ from .avatares import AVATARES, Juan, _texto_perfil, agente_para, es_generico, j
 log = logging.getLogger("mv.motor")
 _LOCKS: dict[int, threading.Lock] = {}
 _LOCKS_GUARD = threading.Lock()
+_EN_ANALISIS: set[int] = set()        # sesiones cuyo análisis corre ahora en este proceso
+_EN_ANALISIS_GUARD = threading.Lock()
 
 
 def _lock(sesion_id: int) -> threading.Lock:
@@ -400,10 +402,35 @@ def terminar(sesion: dict, usuario: dict, en_hilo: bool = True) -> None:
         db.actualizar_sesion(sesion["id"], estado="descartada", fin=db.now())
         return
     db.actualizar_sesion(sesion["id"], estado="analizando", fin=db.now())
-    if en_hilo:
-        threading.Thread(target=analizar, args=(sesion["id"],), daemon=True, name=f"analisis-{sesion['id']}").start()
+    lanzar_analisis(sesion["id"], en_hilo=en_hilo)
+
+
+def lanzar_analisis(sesion_id: int, en_hilo: bool = True) -> bool:
+    """Lanza el análisis si no está corriendo ya en este proceso. Devuelve True si lo lanzó."""
+    with _EN_ANALISIS_GUARD:
+        if sesion_id in _EN_ANALISIS:
+            return False
+        _EN_ANALISIS.add(sesion_id)
+    if en_hilo and not settings.ANALISIS_SINCRONO:
+        threading.Thread(target=analizar, args=(sesion_id,), daemon=True, name=f"analisis-{sesion_id}").start()
     else:
-        analizar(sesion["id"])
+        analizar(sesion_id)
+    return True
+
+
+def analizando_ahora(sesion_id: int) -> bool:
+    return sesion_id in _EN_ANALISIS
+
+
+def recuperar_interrumpidos() -> int:
+    """Al arrancar: las sesiones que quedaron 'analizando' porque el servidor se reinició (un deploy mata los hilos) se vuelven a analizar."""
+    n = 0
+    for s in db.sesiones(estado="analizando", limite=200):
+        if lanzar_analisis(s["id"]):
+            n += 1
+    if n:
+        db.log("warn", "sesion", f"{n} análisis interrumpidos por reinicio se relanzaron", "")
+    return n
 
 
 def descartar(sesion: dict) -> None:
@@ -411,6 +438,14 @@ def descartar(sesion: dict) -> None:
 
 
 def analizar(sesion_id: int) -> None:
+    try:
+        _analizar(sesion_id)
+    finally:
+        with _EN_ANALISIS_GUARD:
+            _EN_ANALISIS.discard(sesion_id)
+
+
+def _analizar(sesion_id: int) -> None:
     from . import analista, roadmap  # import tardío: evita ciclos
     sesion = db.sesion(sesion_id)
     if not sesion or sesion["estado"] != "analizando":
@@ -463,10 +498,7 @@ def reintentar_analisis(sesion_id: int) -> None:
     s = db.sesion(sesion_id)
     if s and s["estado"] == "error" and s["turnos"] > 0:
         db.actualizar_sesion(sesion_id, estado="analizando", error="")
-        if settings.ANALISIS_SINCRONO:
-            analizar(sesion_id)
-        else:
-            threading.Thread(target=analizar, args=(sesion_id,), daemon=True).start()
+        lanzar_analisis(sesion_id)
 
 
 def minutos_transcurridos(sesion: dict) -> int:

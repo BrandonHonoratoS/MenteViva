@@ -278,6 +278,22 @@ def sesion(request: Request, sid: int, u: dict = Depends(requiere_usuario)):
                   salida="/diagnostico" if s["tipo"] == "diagnostico" else ("/entrenar/liderazgo" if u["rol"] == "director" else "/hoy"))
 
 
+@router.post("/sesion/{sid}/descartar")
+def sesion_descartar(request: Request, sid: int, u: dict = Depends(requiere_usuario), csrf: str = Form("")):
+    """Descartar desde Hoy o el catálogo (formulario): libera a la persona de una práctica abierta, trabada o con error."""
+    verificar_csrf(request, u, csrf)
+    s = db.sesion(sid)
+    if not s or s["usuario_id"] != u["id"]:
+        raise HTTPException(404, "Sesión no encontrada")
+    if s["estado"] in ("en_curso", "error") or (s["estado"] == "analizando" and not motor.analizando_ahora(sid)):
+        motor.descartar(s)
+        if s["tipo"] == "diagnostico":
+            db.guardar_perfil(u["id"], estado="onboarding", sesion_diagnostico_id=None)
+        db.log("info", "sesion", f"Sesión {sid} descartada por la persona", s["estado"], u["email"])
+    destino = request.headers.get("referer") or "/hoy"
+    return RedirectResponse(destino if destino.split("?")[0].endswith(("/hoy", "/catalogo", "/entrenar/liderazgo")) else "/hoy", status_code=303)
+
+
 @router.get("/sesion/{sid}/reporte")
 def reporte(request: Request, sid: int, u: dict = Depends(requiere_usuario)):
     s = db.sesion(sid)

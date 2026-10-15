@@ -168,7 +168,7 @@ async def descartar(sid: int, request: Request, u: dict = Depends(requiere_usuar
     body = await _json(request)
     verificar_csrf(request, u, body.get("csrf"))
     s = _sesion_propia(sid, u)
-    if s["estado"] in ("en_curso", "error"):
+    if s["estado"] in ("en_curso", "error") or (s["estado"] == "analizando" and not motor.analizando_ahora(sid)):
         motor.descartar(s)
         if s["tipo"] == "diagnostico":
             db.guardar_perfil(u["id"], estado="onboarding", sesion_diagnostico_id=None)
@@ -189,6 +189,9 @@ async def reintentar(sid: int, request: Request, u: dict = Depends(requiere_usua
 @router.get("/sesiones/{sid}/estado")
 def estado(sid: int, u: dict = Depends(requiere_usuario)):
     s = _sesion_propia(sid, u)
+    if s["estado"] == "analizando" and not motor.analizando_ahora(sid):
+        motor.lanzar_analisis(sid)   # el análisis se interrumpió (reinicio del servidor): se relanza solo
+        s = db.sesion(sid)
     destino = None
     if s["estado"] == "completada":
         destino = "/mi-diagnostico" if s["tipo"] == "diagnostico" else f"/sesion/{sid}/reporte"

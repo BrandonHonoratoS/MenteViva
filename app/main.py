@@ -25,6 +25,11 @@ async def _vida(app: FastAPI):
     from . import correo
     correo.instalar()
     scheduler.iniciar()
+    from .agents import motor
+    try:
+        motor.recuperar_interrumpidos()
+    except Exception:  # noqa: BLE001
+        log.exception("No se pudieron relanzar los análisis interrumpidos")
     est = db.estado_datos()
     log.info("%s v%s lista · LLM=%s · datos=%s · %s empresas · %s usuarios activos · %s sesiones · disco %s", settings.APP_NAME, settings.VERSION,
              settings.LLM_PROVEEDOR, settings.DB_PATH, est["conteos"]["empresas"], est["usuarios_activos"], est["conteos"]["sesiones"],
