@@ -226,11 +226,80 @@ for u in colabs:
                 motor.turno(db.sesion(ses["id"]), db.usuario(u["id"]), "Entiendo la urgencia; déjeme proponerle dos alternativas realistas.")
             motor.terminar(db.sesion(ses["id"]), db.usuario(u["id"]), en_hilo=False)
             _retrodatar(ses["id"], dias)
+    # escenarios nuevos: una presentación con voz, una práctica de imagen con foto y una de comunicación (datos retrodatados)
+    def _fb(kpis, n):
+        return {"resumen": "Práctica analizada con evidencia.", "kpis": [{"id": f"KPI-{i}", "score": max(20, min(98, int(k))), "evidencia": f"turno {i}", "bien": "Conducta observada.", "mejora": "Micro-práctica concreta."} for i, k in zip(range(1, n + 1), kpis)],
+                "fortalezas": [{"habilidad": "Apertura con pregunta", "evidencia": "¿Cuánto tiempo pierde tu equipo…?", "por_que_importa": "Conecta con una necesidad real."}],
+                "oportunidades": [{"habilidad": "Cierre", "evidencia": "terminó con 'eso sería todo'", "impacto": "La audiencia no sabe qué sigue.", "micro_practica": "Prepara el cierre antes de presentar."}],
+                "blind_spot": "Usa 'este' al cambiar de idea.", "momentos_clave": [{"turno": 1, "tipo": "destacó", "que_paso": "Abrió con una pregunta relevante.", "que_habria_cambiado": "—"}],
+                "plan_accion": [{"paso": "Graba tres aperturas de 30 s", "como_medir": "La tercera sin muletillas"}, {"paso": "Diseña el cierre antes", "como_medir": "Siguiente paso explícito"}, {"paso": "Comprueba comprensión", "como_medir": "Una pregunta de aplicación"}],
+                "tips": ["Pausa antes de la pregunta.", "Una idea, tres mensajes.", "Última frase con intención."], "pregunta_para_llevarse": "¿Qué quieres que recuerden mañana?",
+                "recomendacion": {"nivel_sugerido": "Intermedio", "objetivo_siguiente": "Cerrar en 30–45 s con un siguiente paso", "razon": "El cierre es la brecha principal."},
+                "mantener_mejorar_practicar": {"mantener": "La pregunta inicial", "mejorar": "El cierre", "practicar": "Grabar tres cierres"}}
+    gemini.STUB_OVERRIDES["valeria.diseno"] = {"titulo": "Automatización de actividades para la líder de operaciones", "encuadre": "Apertura de 30 s y presentación de 3 min.", "personaje": "Laura, líder de operaciones",
+                                              "situacion": "Reunión de 15 minutos; Laura quiere saber si vale la pena.", "primer_mensaje": "Tengo 15 minutos. Graba tu apertura de 30 segundos.", "tarea": "Graba tu apertura de 30 s y después una presentación de 3 min", "duracion_objetivo_s": 180, "dificultad_inicial": 2}
+    gemini.STUB_OVERRIDES["valeria.turno"] = {"mensaje": "Me interesa. ¿Qué tendría que hacer mi equipo el lunes?", "tension": 40, "estado": "en_curso"}
+    gemini.STUB_OVERRIDES["valeria.feedback"] = _fb([base + 10, base, base + 5, base - 5, base - 10, base, base + 2, base + 12, base + 15], 9)
+    ses = motor.iniciar(db.usuario(u["id"]), "presentaciones", nivel="Intermedio", voluntaria=True)
+    audio = {"transcripcion": "¿Cuánto tiempo pierde tu equipo cada semana en tareas que podrían automatizarse? Hoy veremos, este, cómo una automatización en Odoo libera ese tiempo.", "duracion_s": 172, "palabras": 410,
+             "ppm": 143, "muletillas": 6, "muletillas_min": 2.1, "muletillas_detalle": "este 4, eh 2", "pausas_largas": 2, "ritmo": "adecuado", "variedad_vocal": "adecuada", "volumen": "adecuado", "energia_cierre": "estable", "seguridad": 3, "observaciones_voz": "Énfasis en 'tiempo'; pausa antes de la pregunta."}
+    motor.turno(db.sesion(ses["id"]), db.usuario(u["id"]), audio["transcripcion"], meta_usuario={"audio": audio})
+    motor.turno(db.sesion(ses["id"]), db.usuario(u["id"]), "El lunes elegimos un proceso piloto y medimos el tiempo actual.")
+    motor.terminar(db.sesion(ses["id"]), db.usuario(u["id"]), en_hilo=False)
+    _retrodatar(ses["id"], 5)
+    gemini.STUB_OVERRIDES["renata.diseno"] = {"titulo": "Comida con el director de compras", "encuadre": "Outfit y modales para una comida formal.", "personaje": "Renata y el director de compras", "situacion": "Comida formal en el restaurante del cliente.",
+                                             "primer_mensaje": "Describe o fotografía el outfit que llevarías a la comida.", "tarea": "Envía una foto o describe tu outfit y luego saluda al director", "duracion_objetivo_s": 0, "dificultad_inicial": 2}
+    gemini.STUB_OVERRIDES["renata.turno"] = {"mensaje": "Veo el conjunto. ¿Qué calcetín llevas y de qué color es el cinturón?", "tension": 30, "estado": "en_curso"}
+    gemini.STUB_OVERRIDES["renata.feedback"] = _fb([base + 8, base - 4, base + 6, base, base - 6, base + 4], 6)
+    ses = motor.iniciar(db.usuario(u["id"]), "imagen", nivel="Principiante", voluntaria=True)
+    foto = {"es_outfit": True, "descripcion": "Traje azul marino, camisa blanca, corbata gris, zapatos negros de piel.", "codigo_detectado": "formal de negocios", "ajuste": "manga del saco cubre el puño por completo",
+            "cuidado": "camisa planchada", "color": "coherente", "accesorios": "reloj discreto, cinturón café", "detalles_a_revisar": ["calcetines", "largo del pantalón"], "nota_privacidad": "imagen de referencia/catálogo"}
+    motor.turno(db.sesion(ses["id"]), db.usuario(u["id"]), "Te envío una foto de mi outfit.", meta_usuario={"foto": foto})
+    motor.turno(db.sesion(ses["id"]), db.usuario(u["id"]), "Calcetín azul marino y cinturón negro; el perfume me lo puse recién bañado.")
+    motor.terminar(db.sesion(ses["id"]), db.usuario(u["id"]), en_hilo=False)
+    _retrodatar(ses["id"], 4)
+    gemini.STUB_OVERRIDES["mateo.diseno"] = {"titulo": "El compañero que no entrega a tiempo", "encuadre": "Pedir un cambio sin reclamar.", "personaje": "Rodrigo, compañero de proyecto", "situacion": "Rodrigo entregó tarde por tercera vez y tú tienes que cubrirlo con el cliente.",
+                                            "primer_mensaje": "Ya sé, ya sé… es que tengo mil cosas.", "tarea": "Pon un límite claro, escucha y cierra un acuerdo con fecha", "duracion_objetivo_s": 0, "dificultad_inicial": 2}
+    gemini.STUB_OVERRIDES["mateo.turno"] = {"mensaje": "Va… ¿y si te aviso un día antes cuando no voy a llegar?", "tension": 35, "estado": "en_curso"}
+    gemini.STUB_OVERRIDES["mateo.feedback"] = _fb([base + 6, base + 10, base - 2, base, base + 4, base + 8], 6)
+    ses = motor.iniciar(db.usuario(u["id"]), "comunicacion", nivel="Principiante", voluntaria=True)
+    motor.turno(db.sesion(ses["id"]), db.usuario(u["id"]), "Rodrigo, las últimas tres entregas llegaron tarde y yo quedé mal con el cliente. Necesito que me avises con un día de anticipación cuando no vayas a llegar.")
+    motor.terminar(db.sesion(ses["id"]), db.usuario(u["id"]), en_hilo=False)
+    _retrodatar(ses["id"], 3)
     # evaluaciones
     d = db.area(u["area_id"])
     if d and d.get("director_id"):
         db.guardar_evaluacion("lider", d["director_id"], u["id"], db.periodo(), {"aplica": random.randint(3, 5), "comunicacion": 4, "escucha": random.randint(3, 5), "presion": 3, "resultados": 4}, "Se nota en las juntas.")
     db.guardar_evaluacion("auto", u["id"], u["id"], db.periodo(), {"aplica": 4, "confianza": 4, "habito": 3, "utilidad": 5})
+
+# encuesta de experiencia respondida (menos Carlos, para ver el bloqueo obligatorio en la demo)
+for u in colabs:
+    if u["email"] != "carlos@demo.mx" and not db.encuesta_de(u["id"]):
+        prim = db.pendiente_encuesta(u["id"])
+        db.guardar_encuesta(u["id"], EID, {"relacion": "Colaborador de mi empresa", "veces_uso": random.choice(["Una vez", "De 2 a 3 veces"]), "edad": "25–34", "experiencia": "2 a 5", "uso_ia": "Cada semana",
+                                           "dispositivo": random.choice(["Computadora", "Celular"]), "capacitacion_previa": "Sí, en línea", "utilidad": random.choice(["4 · Muy útil", "5 · Extremadamente útil"]),
+                                           "calificacion": random.randint(7, 10), "realismo": random.randint(3, 5), "utilidad_feedback": random.randint(4, 5), "facilidad": random.randint(3, 5),
+                                           "valora": random.sample(["Simulaciones de conversaciones reales", "Retroalimentación de la IA", "Poder practicar sin temor a equivocarme", "Las master class de Sócrates"], 2),
+                                           "aprendizaje": "Sí, claramente", "frecuencia": random.choice(["Varias veces por semana", "Una vez por semana"]), "nps": random.randint(7, 10),
+                                           "gusto": "El feedback con evidencia textual.", "mejora": "Más escenarios de mi área.", "fallo": "", "pagaria": random.choice(["Sí, con las funcionalidades actuales", "Tal vez, dependiendo del precio", "Preferiría que mi empresa pagara el acceso"]),
+                                           "monto_mensual": random.choice(["$100 a $149 MXN", "$150 a $199 MXN", "$200 MXN o más"]), "precio_unico": random.choice([800, 1200, 1500]), "modalidad_pago": random.choice(["Mensual", "Anual (cada 12 meses)"]),
+                                           "cuando_pagar": random.choice(["De inmediato", "En 1 a 3 meses", "Después de probar más funcionalidades"]), "quien_paga": "Mi empresa", "funciones": ["Avatares con voz", "App móvil"],
+                                           "comparacion": "", "entrevista": random.choice(["Sí", "No"]), "comentario": ""}, sesion_id=(prim or {}).get("id"))
+
+# la directora Odoo hace el test de estilo y una sesión de liderazgo
+from app.agents import conocimiento as K  # noqa: E402
+diana = usuarios["diana@demo.mx"]
+if not db.sesiones(usuario_id=diana["id"], habilidad="liderazgo", limite=1):
+    est = K.estilo_liderazgo(list("ccccaabbcd")); est["fecha"] = db.now()
+    db.guardar_nivel(diana["id"], "liderazgo", "Intermedio", competencias={"estilo": est})
+    gemini.STUB_OVERRIDES["patricia.diseno"] = {"titulo": "El consultor senior que no quiere el cambio de metodología", "encuadre": "Gestionar resistencia y decidir.", "personaje": "Marco, consultor senior",
+                                               "situacion": "Anunciaste el nuevo estándar de documentación y Marco se resiste.", "primer_mensaje": "La verdad no veo para qué cambiar lo que funciona.", "tarea": "Gestiona la resistencia, decide y acuerda siguientes pasos", "duracion_objetivo_s": 0, "dificultad_inicial": 3}
+    gemini.STUB_OVERRIDES["patricia.turno"] = {"mensaje": "Ok, pero ¿quién me va a ayudar con la carga?", "tension": 50, "estado": "en_curso"}
+    gemini.STUB_OVERRIDES["patricia.feedback"] = {**gemini.STUB_OVERRIDES["mateo.feedback"], "kpis": [{"id": f"KPI-{i}", "score": sc, "evidencia": "e", "bien": "b", "mejora": "m"} for i, sc in zip(range(1, 7), (78, 62, 85, 70, 66, 60))]}
+    ses = motor.iniciar(db.usuario(diana["id"]), "liderazgo", nivel="Intermedio", voluntaria=True)
+    motor.turno(db.sesion(ses["id"]), db.usuario(diana["id"]), "Marco, entiendo que funciona; el cambio es por los clientes que piden trazabilidad. ¿Qué te preocupa concretamente?")
+    motor.terminar(db.sesion(ses["id"]), db.usuario(diana["id"]), en_hilo=False)
+    _retrodatar(ses["id"], 2)
 
 for a in db.areas(EID):
     analista.resumen_periodico(EID, "area", area_id=a["id"], dias=30)

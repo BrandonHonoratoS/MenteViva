@@ -23,6 +23,12 @@ Todas las instrucciones viven en `app/agents/prompts.py`; los esquemas de salida
 - Feedback de 9 secciones: resumen, sub-dimensiones /10, global /10 + dominio (Principiante 1–4 · En desarrollo 5–6 · Sólido 7–8 · Listo 9–10), fortalezas, brechas para ascender, momento clave, plan (qué / cómo esta semana / señal), tips, siguiente competencia.
 - Ascenso: propuesta automática con evidencia cuando todas las competencias del siguiente nivel cumplen la regla; RRHH aprueba y Juan diseña el nuevo plan.
 
+El diplomado en Administración de Proyectos (Lean Progress: PMBOK 7, charter, EDT, PERT/CPM y ruta crítica, costos, riesgos, Scrum, Lean, cierre;
+`conocimiento.DIPLOMADO_PM`) y su módulo de liderazgo (`conocimiento.LIDERAZGO`) se añaden a Juan como materiales de referencia en el diseño y el
+análisis de las competencias que los usan (PMBOK, Scrum, Toma de decisiones, PMO, Gestión del cambio, Delegación, Retroalimentación…), a la base
+del Laboratorio DM y a Sócrates. La sesión 1 de "Manejo de objeciones para técnicos no tan técnicos" (`conocimiento.OBJECIONES_TECNICOS`) y la
+imagen vendedora/neuroventas alimentan la Clínica de Ventas en Sócrates.
+
 ### Laboratorio Interactivo de Habilidades para Delivery Managers (`agents/laboratorio.py`)
 
 - **Qué es**: simulación profesional de dos casos con eventos encadenados — *Proyecto Fénix* (entrega bajo presión: reunión, presión del cliente, riesgo oculto, cambio de alcance, CIO en 90 s) y *War Room* (incidente en producción: llamada, nueva evidencia, fatiga del equipo, presión ejecutiva, cierre operativo). Juan actúa como **evaluador neutral**: presenta, reacciona como los personajes, libera información, registra evidencia en silencio y sólo evalúa al final.
@@ -32,6 +38,31 @@ Todas las instrucciones viven en `app/agents/prompts.py`; los esquemas de salida
 - **Reporte** (`FEEDBACK_LABORATORIO`, 100 puntos): Escucha activa 30 · Manejo del estrés y liderazgo bajo presión 25 · Gestión de proyectos/PMBOK 25 · Comunicación ejecutiva 20; escala 90+ sobresaliente / 80 sólido / 70 funcional / 60 en desarrollo / <60 requiere fortalecimiento; radar cualitativo, 3 fortalezas (evidencia + por qué), 3 oportunidades (observado, riesgo, cómo fortalecerlo), 3–5 momentos clave, lectura por habilidad, 3–5 recomendaciones, prioridad de desarrollo y cierre. Principio: evalúa lo que la persona HACE, no lo que dice que sabe; sin puntos por mencionar LEAD/PMBOK/PREP.
 - **Fuente única de conocimiento** (`laboratorio.BASE_CONOCIMIENTO`): destilado compacto (~2.5k tokens) de los cuatro materiales del taller DM2 — *La escucha activa* (ciclo operativo, enemigos, parafraseo, preguntas útiles, L.E.A.D., checklist, 5 prácticas), *Manejo del estrés en equipos* (señales, priorizar, pausas, manejo saludable de incidentes, resiliencia, comunicación en incidentes, antes/durante/después), *Guía PMBOK* (5 grupos de procesos, 10 áreas, triángulo alcance-tiempo-costo, conductas observables) y *Cómo hablar en público* (PREP, Storytelling, 3 Actos, SCQA, 3 ideas, PEP, C.O.N.E.C.T.A., A.I.R.E., lenguaje corporal, audiencia). Viaja sólo en la llamada del reporte (no en cada turno) y, en el chat del coach sobre un reporte de laboratorio, sólo las dos dimensiones relevantes (prioridad + la más baja). El reporte no puede usar modelos ajenos a estos materiales y cada oportunidad cita el material con el que se relaciona.
 - **Integración con la Ruta DM** (Analista): cada dimensión se registra como evidencia de las competencias DM que mapea (Escucha activa; Manejo de ansiedad y Resiliencia; PMBOK; Comunicación e Influencia) y cuenta para la regla de ascenso; el total /100 alimenta las reglas de nivel; la prioridad de desarrollo pasa a ser la **siguiente sesión del plan** (se reordena o se inserta) y el Analista programa el siguiente checkpoint.
+
+## Valeria, Renata, Mateo y Patricia — escenarios por KPI (`agents/avatares.Generico`, `prompts.ESCENARIOS`, `conocimiento.py`)
+Cuatro escenarios nuevos con la misma mecánica (una llamada de diseño con la base de conocimiento, turnos baratos sin base, un análisis final con
+la misma base; KPIs ponderados y niveles Principiante/Intermedio/Avanzado; estándares de empresa con `{estandar}`):
+
+- **Presentaciones de alto impacto** (Valeria Campos, audiencia · CAT-05). Programa de Capital Intelectual/Cóndor: rúbrica de 9 criterios (apertura 12,
+  claridad 15, estructura 12, voz 12, fluidez/muletillas 10, interacción 10, vocabulario 9, cierre 12, tiempo 8) con equivalencia 1–4. La persona
+  puede **grabar su voz**: `agents/adjuntos.transcribir_audio` manda el audio UNA vez a Gemini (entrada nativa) y obtiene transcripción + métricas
+  (duración, ppm, muletillas/min, pausas, ritmo, variedad vocal, energía al cierre, seguridad 1–4); el audio no se guarda. Los turnos y el análisis
+  trabajan con la transcripción y la nota `[Grabación de voz · …]`. Sin grabación, los KPIs de voz quedan "no evaluados" y el score se renormaliza.
+- **Imagen profesional y código de vestimenta** (Renata Solís, consultora · CAT-09). Cinco códigos, medidas y ajuste (hombro, puño, caída del pantalón,
+  largo de falda), calzado, color, accesorios, perfume, etiqueta y buenos modales, imagen vendedora (7 segundos) y neuroventas (Klarić). La persona
+  describe su outfit o **envía una foto** (propia o de referencia): `describir_foto` devuelve una descripción objetiva de la ropa (nunca del cuerpo) y
+  la imagen se descarta. 6 KPIs.
+- **Comunicación verbal efectiva** (Mateo Ibarra, interlocutor · CAT-07). Para todos los contextos (trabajo, pareja, hijos, familia, vecinos,
+  trámites): CNV de Rosenberg, escucha activa, asertividad (DESC, disco rayado, banco de niebla), conversaciones difíciles, Gottman. 6 KPIs; también
+  admite voz.
+- **Liderazgo** (Patricia Navarro, integrante del equipo · CAT-04). Diplomado de Lean Progress: grid gerencial, liderazgo situacional, pentágono del
+  poder, Lewin y Kotter. Antes de la primera sesión, **test de estilo** (10 preguntas → directivo/productor/complaciente/indiferente), guardado en
+  `niveles.competencias_json["estilo"]` y usado por Patricia para diseñar escenas que reten a flexibilizar. **Los directores también entrenan**
+  (`/entrenar/liderazgo`, "Mis prácticas"); sus reportes los ven RRHH y DG, no su equipo. 6 KPIs.
+
+Relevancia (`catalogo.habilidades_que_usa` / `habilidades_nucleo`): comunicación para todo el mundo; presentaciones a quien expone (empresa, estudio,
+busca empleo, lidera, genera negocio); imagen a quien representa a su empresa o negocio o busca empleo; liderazgo sólo a quien lidera; Ruta DM sólo a
+empresa. La experiencia de empresa no cambia: ven todo el catálogo habilitado y Elena decide qué lleva plan.
 
 ## El Analista
 
@@ -63,6 +94,13 @@ El colaborador puede preguntar a Celeste/Elena/Juan sobre su reporte; el context
 - **Modalidades**: `completa` (sesión de 15–25 min) o `micro` "Prepárate 5 minutos" (tres bloques al día, avisos a `MICRO_HORAS` lun–vie sólo si falta el bloque de la franja, racha diaria tipo Duolingo basada en `actividad`: turnos, lecturas y bloques). La elige cada persona en Mi cuenta según sus tiempos (RRHH la ve, no la fija); contenido, sesiones y análisis son idénticos en ambas. Las sesiones ya eran reanudables; la pantalla muestra el temporizador del bloque.
 - **Correo** (`correo.py`): cada aviso in-app se reenvía por SMTP (hilo aparte, nunca bloquea) si está configurado y la persona no lo desactivó; prueba desde Admin; fallos en bitácora (máx. uno cada 5 min).
 - **Ayuda**: página por rol con instrucciones y FAQ + contacto de soporte (WhatsApp y correo, variables `SOPORTE_*`); acceso desde la barra superior y el menú.
+
+## Encuesta de experiencia (`encuesta.py`)
+Tras la primera práctica completada es **obligatoria**: `/entrenar/*`, `/laboratorio` e iniciar sesiones redirigen a `/encuesta?obligatoria=1`
+hasta responderla (no bloquea Sócrates ni el reporte). Preguntas del documento "Preguntas Mente Viva" integradas: relación y veces de uso, utilidad
+1–5, lo que más valora, frecuencia deseada, disposición de pago (5 opciones), monto mensual máximo (rangos MXN), modalidad de pago y cuándo pagaría,
+además de las originales. RRHH ve resumen, lista y **detalle por persona** (`/encuestas/{id}`) sin la sección de precio; el superadmin todo
+(`/admin/encuestas/{id}`); Excel en ambos.
 
 ## Público general y externos (sin tocar la experiencia de empresa)
 

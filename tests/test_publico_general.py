@@ -4,7 +4,7 @@ from __future__ import annotations
 from app import db
 from app.agents import catalogo as C
 from app.llm import gemini
-from tests.conftest import Sesion
+from tests.conftest import Sesion, sesion_rrhh
 from tests.test_laboratorio import _colaborador_con_diagnostico  # noqa: F401  (asegura empresa con ruta_dm y RRHH)
 
 ONB_CERRAJERO = {
@@ -16,7 +16,7 @@ ONB_CERRAJERO = {
 
 
 def test_cerrajero_externo_solo_ve_lo_que_le_sirve(client, stub):
-    rrhh = Sesion(client, "rrhh@condor.mx", "NuevaClaveRRHH1")
+    rrhh = sesion_rrhh(client)
     eid = rrhh.u["empresa_id"]
     r = rrhh.post("/gestion/usuarios", {"nombre": "Don Chucho", "email": "chucho@externos.mx", "puesto": "Cerrajero", "rol": "colaborador", "area_id": db.areas(eid)[0]["id"]})
     clave = r.headers["location"].split("clave=")[1]
@@ -44,7 +44,7 @@ def test_cerrajero_externo_solo_ve_lo_que_le_sirve(client, stub):
     assert {r["habilidad"] for r in rms} == {"ventas"}
     assert not db.propuestas(eid, tipo="roadmap") or all(p["usuario_id"] != uid for p in db.propuestas(eid, tipo="roadmap"))
     rel, otras = C.habilidades_relevantes(ONB_CERRAJERO, db.perfil(uid)["diagnostico"], C.habilidades_empresa(db.empresa(eid)))
-    assert [h["id"] for h in rel] == ["ventas"] and {h["id"] for h in otras} == {"entrevistas", "ruta_dm"}
+    assert [h["id"] for h in rel] == ["ventas", "imagen", "comunicacion"] and {h["id"] for h in otras} == {"entrevistas", "ruta_dm", "presentaciones", "liderazgo"}
     html = chucho.get("/catalogo").text
     assert "Otras habilidades disponibles" in html and html.index("Clínica de Ventas") < html.index("Ruta Delivery Manager")
     assert "Laboratorio DM" not in chucho.get("/hoy").text

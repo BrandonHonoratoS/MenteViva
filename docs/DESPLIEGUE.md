@@ -77,4 +77,6 @@ En tu computadora, con la misma key: `pip install -r requirements.txt` y `python
 1. Gmail/Google Workspace: activa verificación en dos pasos y crea una **contraseña de aplicación**; variables: `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_USER=tu@dominio.com`, `SMTP_PASSWORD=<contraseña de aplicación>`, `SMTP_FROM=tu@dominio.com`. Brevo/SendGrid: su host y puerto 587 con la API key como contraseña.
 2. Define `BASE_URL=https://tu-app.onrender.com` para que los botones del correo abran la plataforma.
 3. Admin → Plataforma → **Enviar prueba**. Si falla, el error exacto del servidor SMTP queda en la bitácora.
-4. Los recordatorios "Prepárate 5 minutos" salen a las `MICRO_HORAS` (zona `TZ`), lunes a viernes, sólo a quienes tengan esa modalidad y les falte el bloque.
+4. Voz y foto: `AUDIO_ENABLED` y `FOTO_ENABLED` (por defecto activos). El navegador pide permiso de micrófono/cámara; la app lo permite en su
+   `Permissions-Policy`. El audio (≈32 tokens/segundo) y la imagen se envían una sola vez a Gemini y no se guardan en el disco de Render.
+5. Los recordatorios "Prepárate 5 minutos" salen a las `MICRO_HORAS` (zona `TZ`), lunes a viernes, sólo a quienes tengan esa modalidad y les falte el bloque.

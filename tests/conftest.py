@@ -53,6 +53,11 @@ class Sesion:
         data.setdefault("csrf", self.csrf)
         return self.c.post(url, data=data, headers=self._h(), follow_redirects=False, **kw)
 
+    def upload(self, url, nombre: str, contenido: bytes, mime: str, data=None):
+        data = dict(data or {})
+        data.setdefault("csrf", self.csrf)
+        return self.c.post(url, data=data, files={"archivo": (nombre, contenido, mime)}, headers=self._h())
+
     def api(self, url, body=None):
         body = dict(body or {})
         body.setdefault("csrf", self.csrf)
@@ -82,3 +87,34 @@ ONBOARDING_VENDEDOR = {
     "dm_lidera": "Superviso a una persona", "dm_trabajo": "Asesorar al cliente", "dm_antiguedad": "6 meses a 2 años", "dm_representa": "Sí, de forma habitual",
     "tiempo_semana": "1 hora", "meta": "Ascender en la ruta de desarrollo",
 }
+
+
+def sesion_rrhh(client) -> Sesion:
+    """RRHH con cualquiera de sus dos contraseñas (test_flujo la cambia); limpia el contador de intentos por IP."""
+    try:
+        s = Sesion(client, "rrhh@condor.mx", "NuevaClaveRRHH1")
+    except AssertionError:
+        db.limpiar_intentos("ip:testclient")
+        s = Sesion(client, "rrhh@condor.mx", "ClaveRRHH123")
+        s.cambiar_password("NuevaClaveRRHH1")
+    db.limpiar_intentos("ip:testclient")
+    return s
+
+
+ENCUESTA_VALIDA = {"relacion": "Colaborador de mi empresa", "veces_uso": "Una vez", "edad": "25–34", "experiencia": "2 a 5", "uso_ia": "Cada semana", "dispositivo": "Computadora",
+                   "capacitacion_previa": "No", "utilidad": "4 · Muy útil", "calificacion": "9", "realismo": "4", "utilidad_feedback": "5", "facilidad": "4",
+                   "valora": ["Retroalimentación de la IA", "Poder practicar sin temor a equivocarme"], "aprendizaje": "Sí, claramente", "frecuencia": "Una vez por semana", "nps": "10",
+                   "gusto": "El feedback con evidencia", "mejora": "Más escenarios", "fallo": "", "pagaria": "Sí, con las funcionalidades actuales", "monto_mensual": "$150 a $199 MXN",
+                   "precio_unico": "1500", "modalidad_pago": "Mensual", "cuando_pagar": "De inmediato", "quien_paga": "Mi empresa", "funciones": ["Avatares con voz", "App móvil"],
+                   "comparacion": "", "entrevista": "Sí", "comentario": "Gracias"}
+
+
+@pytest.fixture(autouse=True)
+def encuesta_no_bloquea(request, monkeypatch):
+    """La encuesta de experiencia es obligatoria tras la primera práctica; en las pruebas sólo se exige donde se prueba explícitamente."""
+    if request.node.get_closest_marker("encuesta_obligatoria"):
+        yield
+        return
+    from app.routes import colaborador
+    monkeypatch.setattr(colaborador, "_encuesta_obligatoria", lambda u: None)
+    yield

@@ -16,6 +16,14 @@
 
 **Reglas de nivel (documento funcional):** > 75 en dos sesiones seguidas sube; < 50 baja; 3 sesiones sin mejora insertan una sesión de refuerzo y avisan al director. **Ascenso DM:** todas las competencias del siguiente nivel entrenadas, promedio ≥ 7/10, ninguna < 5, al menos dos en 9–10 → propuesta que RRHH aprueba.
 
+## Escenarios nuevos (v1.4)
+- **Presentaciones de alto impacto** con Valeria Campos (audiencia): grabas tu voz, la IA transcribe y mide ritmo, muletillas, pausas y tiempo; rúbrica de 9 criterios del programa de Capital Intelectual.
+- **Imagen profesional y código de vestimenta** con Renata Solís: situaciones reales, foto del outfit (propia o de referencia) y etiqueta.
+- **Comunicación verbal efectiva** con Mateo Ibarra: trabajo, pareja, hijos, familia y comunidad.
+- **Liderazgo** con Patricia Navarro: test de estilo (grid gerencial) + escenas de equipo; los directores también entrenan.
+- La Ruta DM y el Laboratorio incorporan el diplomado en Administración de Proyectos; Ventas incorpora "Manejo de objeciones para técnicos no tan técnicos" y neuroventas.
+- La encuesta de experiencia es obligatoria tras la primera práctica y sus respuestas se consultan una por una.
+
 ## Perfiles y tableros
 
 - **Colaborador**: Hoy (siguiente sesión, evolución, racha diaria), Sócrates (master classes), diagnóstico, planes, catálogo (3 habilidades activas + “próximamente”), sesión con avatar (fases, presión, cronómetro, bloques de 5 min), reporte con KPIs/evidencia/plan de acción y chat con el coach, historial, autoevaluación, encuesta de experiencia, ayuda; modalidad completa o “Prepárate 5 minutos” con recordatorios (in-app y correo).
