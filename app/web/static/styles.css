@@ -242,3 +242,10 @@ details.marco summary{cursor:pointer}
 .chip-opt input:checked+span{background:var(--grad);color:#fff;border-color:transparent}
 .field.falta label{color:#BE123C}
 .field.falta .chip-opt span,.field.falta textarea,.field.falta input{border-color:#F43F5E}
+
+/* adjuntos (voz / foto) */
+.msg .adj{display:block;font-size:.72rem;color:var(--muted);margin-bottom:4px}
+.rec-dot{width:10px;height:10px;border-radius:50%;background:#F43F5E;animation:blink 1s infinite}
+@keyframes blink{0%{opacity:1}50%{opacity:.3}100%{opacity:1}}
+.composer #grabar.on{background:#F43F5E;color:#fff}
+.voz-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}

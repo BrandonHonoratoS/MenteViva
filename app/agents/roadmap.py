@@ -46,6 +46,9 @@ def analizar_diagnostico(sesion: dict, usuario: dict, transcript: str) -> None:
         db.guardar_nivel(usuario["id"], "entrevistas", diag.get("nivel_entrevistas") or "Principiante", diag["score_inicial"], "diagnóstico de Elena")
     if "ruta_dm" in ids:
         db.guardar_nivel(usuario["id"], "ruta_dm", diag.get("nivel_dm") or C.nivel_dm_estimado(ob), None, "diagnóstico de Elena")
+    for hid in ids - {"ventas", "entrevistas", "ruta_dm"}:   # escenarios nuevos (presentaciones, imagen, comunicación, liderazgo): nivel por experiencia
+        if not db.nivel(usuario["id"], hid):
+            db.guardar_nivel(usuario["id"], hid, _nivel_inicial(hid, diag, ob), diag["score_inicial"], "diagnóstico de Elena")
 
     # roadmaps: uno por habilidad que a la persona le sirve (su contexto/rol o brecha alta/media según Elena); la Ruta DM sólo para gente de empresa
     usa = C.habilidades_que_usa(ob)
@@ -54,8 +57,8 @@ def analizar_diagnostico(sesion: dict, usuario: dict, transcript: str) -> None:
     orden = [p["habilidad_id"] for p in prioridades]
     if "ruta_dm" in relevantes and "ruta_dm" not in orden:
         orden.append("ruta_dm")
-    if not C.es_contexto_empresa(ob):   # público general: las habilidades de su vida real llevan plan aunque Elena no las listara
-        for hid in relevantes:
+    if not C.es_contexto_empresa(ob):   # público general: el núcleo de su vida real lleva plan aunque Elena no lo listara
+        for hid in C.habilidades_nucleo(ob) & relevantes:
             if hid not in orden:
                 orden.append(hid)
     spw_total = C.sesiones_por_semana(ob.get("tiempo_semana", ""))
@@ -91,7 +94,7 @@ def generar_roadmaps_faltantes(usuario: dict) -> list[str]:
     if "ruta_dm" in relevantes and "ruta_dm" not in orden:
         orden.append("ruta_dm")
     if not C.es_contexto_empresa(ob):
-        for hid in relevantes:
+        for hid in C.habilidades_nucleo(ob) & relevantes:
             if hid not in orden:
                 orden.append(hid)
     existentes = {r["habilidad"] for r in db.roadmaps(usuario["id"], ("activo", "propuesto"))}
@@ -101,14 +104,31 @@ def generar_roadmaps_faltantes(usuario: dict) -> list[str]:
         if hid in existentes:
             continue
         if not db.nivel(usuario["id"], hid):
-            nivel = {"ventas": diag.get("nivel_ventas") or C.nivel_ventas_estimado(ob), "entrevistas": diag.get("nivel_entrevistas") or "Principiante",
-                     "ruta_dm": diag.get("nivel_dm") or C.nivel_dm_estimado(ob)}[hid]
-            db.guardar_nivel(usuario["id"], hid, nivel, diag.get("score_inicial") if hid != "ruta_dm" else None, "diagnóstico de Elena")
+            db.guardar_nivel(usuario["id"], hid, _nivel_inicial(hid, diag, ob), diag.get("score_inicial") if hid != "ruta_dm" else None, "diagnóstico de Elena")
         brecha = next((p.get("brecha") for p in prioridades if p["habilidad_id"] == hid), "media")
         spw = max(1, spw_total // max(1, len(orden)) + (1 if i < spw_total % max(1, len(orden)) else 0))
         generar_roadmap(usuario, hid, brecha=brecha, sesiones_semana=spw, requiere_aprobacion=hid not in usa, diagnostico=diag)
         creados.append(hid)
     return creados
+
+
+def _nivel_inicial(hid: str, diag: dict, ob: dict) -> str:
+    """Nivel de arranque por habilidad: lo que dijo Elena (ventas, entrevistas, Ruta DM) o la experiencia declarada, moderada por las competencias del diagnóstico."""
+    if hid == "ventas":
+        return diag.get("nivel_ventas") or C.nivel_ventas_estimado(ob)
+    if hid == "entrevistas":
+        return diag.get("nivel_entrevistas") or "Principiante"
+    if hid == "ruta_dm":
+        return diag.get("nivel_dm") or C.nivel_dm_estimado(ob)
+    comps = {c.get("nombre"): int(c.get("nivel", 0)) for c in diag.get("competencias", []) if isinstance(c, dict)}
+    clave = {"presentaciones": "Comunicación", "comunicacion": "Comunicación", "liderazgo": "Liderazgo / influencia", "imagen": "Adaptabilidad / aprendizaje"}.get(hid, "Comunicación")
+    n = comps.get(clave, 0)
+    estimado = C.nivel_generico_estimado(ob)
+    if n >= 4:
+        return "Avanzado" if estimado == "Avanzado" else "Intermedio"
+    if n in (1, 2):
+        return "Principiante"
+    return estimado
 
 
 def _managers_de(usuario: dict) -> list[dict]:

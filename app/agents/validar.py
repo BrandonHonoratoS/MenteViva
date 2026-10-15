@@ -278,3 +278,64 @@ def analista_post(js: dict | None) -> dict | None:
 def registrar_si_incompleto(origen: str, js, usuario: str = "") -> None:
     if not isinstance(js, dict):
         db.log("warn", "llm", f"Salida no estructurada en {origen}; se normalizó", str(js)[:200], usuario)
+
+
+# ── escenarios genéricos por KPI ─────────────────────────────────────────────
+def feedback_generico(js: dict | None, sesion: dict) -> dict:
+    js = js if isinstance(js, dict) else {}
+    hab = C.HABILIDADES[sesion["habilidad"]]
+    esc = sesion.get("escenario") or {}
+    kpis = _kpis(js.get("kpis"), hab)
+    audio_ids = C.kpis_audio(hab["id"])
+    if audio_ids and not int(esc.get("grabaciones") or 0):
+        for k in kpis:
+            if k["id"] in audio_ids:
+                k.update({"score": 0, "evaluable": False, "evidencia": "Sin grabación de voz en esta sesión: este criterio no se evaluó ni cuenta para el score.", "bien": "—",
+                          "mejora": "Graba tu voz en la siguiente sesión para evaluar este criterio."})
+    mmp = js.get("mantener_mejorar_practicar") if isinstance(js.get("mantener_mejorar_practicar"), dict) else {}
+    return {
+        "resumen": _texto(js.get("resumen"), "Sesión analizada."), "kpis": kpis,
+        "fortalezas": _items(js.get("fortalezas"), {"habilidad": "Fortaleza", "evidencia": "", "por_que_importa": ""}, 3),
+        "oportunidades": _items(js.get("oportunidades"), {"habilidad": "Oportunidad", "evidencia": "", "impacto": "", "micro_practica": "Practica esto en tu siguiente sesión."}, 3),
+        "blind_spot": _texto(js.get("blind_spot")), "momentos_clave": _momentos(js.get("momentos_clave")),
+        "plan_accion": _items(js.get("plan_accion"), {"paso": "", "como_medir": ""}, 3), "tips": [str(t) for t in _lista(js.get("tips")) if str(t).strip()][:5],
+        "pregunta_para_llevarse": _texto(js.get("pregunta_para_llevarse")), "recomendacion": _recomendacion(js.get("recomendacion"), hab["niveles"], sesion.get("nivel") or "Principiante"),
+        "mantener_mejorar_practicar": {k: _texto(mmp.get(k)) for k in ("mantener", "mejorar", "practicar")},
+        "voz": esc.get("voz_resumen") or None, "fotos": int(esc.get("fotos") or 0), "grabaciones": int(esc.get("grabaciones") or 0),
+    }
+
+
+def diseno_generico(js: dict | None, sesion: dict) -> dict:
+    js = js if isinstance(js, dict) else {}
+    hab = C.HABILIDADES[sesion["habilidad"]]
+    return {"formato": "roleplay", "titulo": _texto(js.get("titulo"), f"Práctica de {hab['corto'].lower()}")[:120],
+            "encuadre": _texto(js.get("encuadre"), f"Hoy practicas {hab['nombre'].lower()} en una situación de tu vida real."),
+            "personaje": _texto(js.get("personaje"), hab["avatar"])[:200], "situacion": _texto(js.get("situacion"), "Situación de tu contexto.")[:1500],
+            "primer_mensaje": _texto(js.get("primer_mensaje"))[:1500], "tarea": _texto(js.get("tarea"))[:600],
+            "duracion_objetivo_s": int(_num(js.get("duracion_objetivo_s"), 0, 600, default=0)), "dificultad_inicial": int(_num(js.get("dificultad_inicial"), 1, 5, default=2))}
+
+
+def audio(js: dict | None, duracion_real: float | None = None) -> dict:
+    js = js if isinstance(js, dict) else {}
+    dur = int(_num(js.get("duracion_s"), 0, 900, default=0))
+    if duracion_real:
+        dur = int(duracion_real)
+    palabras = int(_num(js.get("palabras"), 0, 5000))
+    ppm = int(_num(js.get("palabras_por_minuto"), 0, 400, default=(palabras / dur * 60) if dur else 0))
+    mul = int(_num(js.get("muletillas"), 0, 500))
+    return {"transcripcion": _texto(js.get("transcripcion"))[:12000], "duracion_s": dur, "palabras": palabras, "ppm": ppm, "muletillas": mul,
+            "muletillas_min": round(mul / dur * 60, 1) if dur else 0.0, "muletillas_detalle": _texto(js.get("muletillas_detalle"))[:300],
+            "pausas_largas": int(_num(js.get("pausas_largas"), 0, 200)),
+            "ritmo": js.get("ritmo") if js.get("ritmo") in ("muy lento", "lento", "adecuado", "rápido", "muy rápido") else "adecuado",
+            "variedad_vocal": js.get("variedad_vocal") if js.get("variedad_vocal") in ("monótona", "poca", "adecuada", "alta") else "adecuada",
+            "volumen": js.get("volumen") if js.get("volumen") in ("bajo", "adecuado", "alto", "irregular") else "adecuado",
+            "energia_cierre": js.get("energia_cierre") if js.get("energia_cierre") in ("se apaga", "estable", "sube") else "estable",
+            "seguridad": int(_num(js.get("seguridad"), 1, 4, default=2)), "observaciones_voz": _texto(js.get("observaciones_voz"))[:600]}
+
+
+def foto(js: dict | None) -> dict:
+    js = js if isinstance(js, dict) else {}
+    codigos = ("formal de negocios", "business casual", "smart casual", "casual", "casual viernes", "no profesional", "no determinable")
+    return {"es_outfit": bool(js.get("es_outfit", True)), "descripcion": _texto(js.get("descripcion"))[:1500], "codigo_detectado": js.get("codigo_detectado") if js.get("codigo_detectado") in codigos else "no determinable",
+            "ajuste": _texto(js.get("ajuste"))[:500], "cuidado": _texto(js.get("cuidado"))[:400], "color": _texto(js.get("color"))[:300], "accesorios": _texto(js.get("accesorios"))[:300],
+            "detalles_a_revisar": [str(x)[:120] for x in _lista(js.get("detalles_a_revisar"))][:6], "nota_privacidad": _texto(js.get("nota_privacidad"))[:60]}

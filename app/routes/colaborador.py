@@ -17,6 +17,14 @@ from ..web import render
 
 router = APIRouter()
 colab = requiere_rol("colaborador")
+entrena = requiere_rol("colaborador", "director")   # los directores también entrenan (Liderazgo); sus resultados los ven RRHH y DG, no su equipo
+
+
+def _encuesta_obligatoria(u: dict):
+    """Tras la primera práctica completada, la encuesta de experiencia es obligatoria antes de abrir otra sesión."""
+    if u["rol"] == "colaborador" and db.pendiente_encuesta(u["id"]):
+        return RedirectResponse("/encuesta?obligatoria=1", status_code=307)
+    return None
 
 
 def _habilidades(u: dict) -> list[dict]:
@@ -127,18 +135,26 @@ def catalogo(request: Request, u: dict = Depends(colab)):
                   en_curso=db.sesion_en_curso(u["id"]))
 
 
-@router.get("/entrenar/{habilidad}")
-def entrenar(request: Request, habilidad: str, u: dict = Depends(colab), item: int | None = None):
+def _hab_entrenable(u: dict, habilidad: str) -> dict:
     hab = C.habilidad(habilidad)
-    if not hab or hab not in _habilidades(u):
+    if not hab or hab not in _habilidades(u) or (u["rol"] == "director" and not hab.get("para_directores")):
         raise HTTPException(404, "Habilidad no disponible")
+    return hab
+
+
+@router.get("/entrenar/{habilidad}")
+def entrenar(request: Request, habilidad: str, u: dict = Depends(entrena), item: int | None = None):
+    hab = _hab_entrenable(u, habilidad)
     perfil = db.perfil(u["id"])
-    if perfil.get("estado") != "completo":
+    if perfil.get("estado") != "completo" and u["rol"] == "colaborador":
         return RedirectResponse("/diagnostico", status_code=307)
     en_curso = db.sesion_en_curso(u["id"])
     if en_curso:
         return RedirectResponse(f"/sesion/{en_curso['id']}", status_code=307)
-    it = None if item == 0 else (db.roadmap_item(item) if item else db.siguiente_item(u["id"], habilidad))
+    bloqueo = _encuesta_obligatoria(u)
+    if bloqueo:
+        return bloqueo
+    it = None if (item == 0 or u["rol"] == "director") else (db.roadmap_item(item) if item else db.siguiente_item(u["id"], habilidad))
     if it and (it["usuario_id"] != u["id"] or it["estado"] != "pendiente" or it.get("roadmap_estado") != "activo"):
         it = None
     if it and it.get("tipo") == "laboratorio":
@@ -151,19 +167,42 @@ def entrenar(request: Request, habilidad: str, u: dict = Depends(colab), item: i
     if it and (u.get("modalidad") or "completa") == "completa":
         lec = db.leccion_por_tema(u["id"], habilidad, S.tema_para_item(habilidad, it))
         leccion = lec if lec and lec["estado"] == "lista" else None
+    from ..agents import conocimiento as K
+    estilo = (niv.get("competencias") or {}).get("estilo") if hab.get("test") == "liderazgo" else None
+    historial = [x for x in db.sesiones(usuario_id=u["id"], habilidad=habilidad, estado="completada", limite=3) if x["tipo"] == "practica"]
     return render(request, "entrenar.html", u, hab=hab, item=it, nivel=nivel, niv=niv, perfil=perfil, avatar=AVATARES[hab["agente"]], leccion=leccion,
                   tema_socrates=S.tema_para_item(habilidad, it) if it else "",
                   competencias=C.competencias_dm(sig_dm) if sig_dm else [], sig_dm=sig_dm, valor_dm=C.valor_dm(sig_dm) if sig_dm else "",
-                  duracion=C.duracion_min(habilidad, nivel), kpis=hab.get("kpis", []), pesos=(hab.get("pesos") or {}).get(nivel, {}))
+                  duracion=C.duracion_min(habilidad, nivel), kpis=hab.get("kpis", []), pesos=(hab.get("pesos") or {}).get(nivel, {}),
+                  test=K.TEST_LIDERAZGO if hab.get("test") == "liderazgo" else None, estilo=estilo, estilos=K.ESTILOS_LIDERAZGO, historial=historial,
+                  audio_ok=settings.AUDIO_ENABLED and bool(hab.get("audio")), foto_ok=settings.FOTO_ENABLED and bool(hab.get("foto")))
+
+
+@router.post("/entrenar/liderazgo/test")
+async def test_liderazgo(request: Request, u: dict = Depends(entrena)):
+    """Test de estilo de liderazgo (grid gerencial, 10 preguntas a/b/c/d): se guarda en el nivel de la habilidad y lo usa Patricia para diseñar la escena."""
+    form = await request.form()
+    verificar_csrf(request, u, form.get("csrf"))
+    _hab_entrenable(u, "liderazgo")
+    from ..agents import conocimiento as K
+    respuestas = [str(form.get(f"q{i}", "")) for i in range(len(K.TEST_LIDERAZGO))]
+    if any(r not in ("a", "b", "c", "d") for r in respuestas):
+        raise HTTPException(400, "Responde las 10 preguntas del test.")
+    est = K.estilo_liderazgo(respuestas)
+    est["fecha"] = db.now()
+    niv = db.nivel(u["id"], "liderazgo") or {}
+    db.guardar_nivel(u["id"], "liderazgo", niv.get("nivel") or C.nivel_generico_estimado((db.perfil(u["id"]).get("onboarding") or {})), competencias={"estilo": est})
+    db.log("info", "sesion", f"Test de liderazgo de {u['email']}", f"estilo {est['predominante']}", u["email"])
+    return RedirectResponse("/entrenar/liderazgo", status_code=303)
 
 
 @router.post("/entrenar/{habilidad}/iniciar")
-def entrenar_iniciar(request: Request, habilidad: str, u: dict = Depends(colab), csrf: str = Form(""), item: int = Form(0), nivel: str = Form(""),
+def entrenar_iniciar(request: Request, habilidad: str, u: dict = Depends(entrena), csrf: str = Form(""), item: int = Form(0), nivel: str = Form(""),
                      competencia: str = Form(""), producto: str = Form(""), objetivo: str = Form("")):
     verificar_csrf(request, u, csrf)
-    hab = C.habilidad(habilidad)
-    if not hab or hab not in _habilidades(u):
-        raise HTTPException(404, "Habilidad no disponible")
+    hab = _hab_entrenable(u, habilidad)
+    if _encuesta_obligatoria(u):
+        raise HTTPException(409, "Antes de tu siguiente práctica responde la encuesta de experiencia.")
     it = db.roadmap_item(item) if item else None
     if it and (it["usuario_id"] != u["id"] or it["estado"] != "pendiente"):
         it = None
@@ -197,6 +236,9 @@ def laboratorio(request: Request, u: dict = Depends(colab), item: int | None = N
     en_curso = db.sesion_en_curso(u["id"])
     if en_curso:
         return RedirectResponse(f"/sesion/{en_curso['id']}", status_code=307)
+    bloqueo = _encuesta_obligatoria(u)
+    if bloqueo:
+        return bloqueo
     it = db.roadmap_item(item) if item else None
     if it and (it["usuario_id"] != u["id"] or it["estado"] != "pendiente" or it.get("tipo") != "laboratorio"):
         it = None
@@ -231,7 +273,9 @@ def sesion(request: Request, sid: int, u: dict = Depends(requiere_usuario)):
         return RedirectResponse(f"/sesion/{sid}/reporte", status_code=307)
     hab = C.HABILIDADES[s["habilidad"]]
     return render(request, "sesion.html", u, s=s, hab=hab, avatar=AVATARES[s["agente"]], mensajes=db.mensajes(sid),
-                  turnos_max=C.turnos_max_sesion(s), duracion=C.duracion_sesion(s), propia=s["usuario_id"] == u["id"], micro_min=settings.MICRO_MINUTOS)
+                  turnos_max=C.turnos_max_sesion(s), duracion=C.duracion_sesion(s), propia=s["usuario_id"] == u["id"], micro_min=settings.MICRO_MINUTOS,
+                  audio_ok=settings.AUDIO_ENABLED and bool(hab.get("audio")) and s["tipo"] == "practica", foto_ok=settings.FOTO_ENABLED and bool(hab.get("foto")) and s["tipo"] == "practica",
+                  salida="/diagnostico" if s["tipo"] == "diagnostico" else ("/entrenar/liderazgo" if u["rol"] == "director" else "/hoy"))
 
 
 @router.get("/sesion/{sid}/reporte")
@@ -258,9 +302,10 @@ def reporte(request: Request, sid: int, u: dict = Depends(requiere_usuario)):
 
 # ── encuesta de primera experiencia ──────────────────────────────────────────
 @router.get("/encuesta")
-def encuesta(request: Request, u: dict = Depends(colab)):
+def encuesta(request: Request, u: dict = Depends(colab), obligatoria: int = 0):
     from .. import encuesta as ENC
-    return render(request, "encuesta.html", u, secciones=ENC.SECCIONES, previo={}, faltan=[], hecha=bool(db.encuesta_de(u["id"])))
+    return render(request, "encuesta.html", u, secciones=ENC.SECCIONES, previo={}, faltan=[], hecha=bool(db.encuesta_de(u["id"])), obligatoria=bool(obligatoria),
+                  intro=ENC.INTRO, gracias=ENC.GRACIAS)
 
 
 @router.post("/encuesta")
@@ -272,7 +317,7 @@ async def encuesta_post(request: Request, u: dict = Depends(colab)):
         return RedirectResponse("/encuesta", status_code=303)
     respuestas, faltan = ENC.validar(form)
     if faltan:
-        return render(request, "encuesta.html", u, secciones=ENC.SECCIONES, previo=respuestas, faltan=faltan, hecha=False, status_code=400)
+        return render(request, "encuesta.html", u, secciones=ENC.SECCIONES, previo=respuestas, faltan=faltan, hecha=False, status_code=400, obligatoria=True, intro=ENC.INTRO, gracias=ENC.GRACIAS)
     primera = db.pendiente_encuesta(u["id"])
     db.guardar_encuesta(u["id"], u.get("empresa_id"), respuestas, sesion_id=(primera or {}).get("id"))
     db.log("info", "encuesta", f"Encuesta de experiencia respondida por {u['email']}", f"calificación {respuestas.get('calificacion')} · NPS {respuestas.get('nps')}", u["email"])
@@ -282,7 +327,7 @@ async def encuesta_post(request: Request, u: dict = Depends(colab)):
 
 
 @router.get("/historial")
-def historial(request: Request, u: dict = Depends(colab)):
+def historial(request: Request, u: dict = Depends(entrena)):
     ss = db.sesiones(usuario_id=u["id"], limite=200)
     return render(request, "historial.html", u, sesiones=ss, serie=metrics.serie_scores(u["id"], limite=30), resumen=metrics.resumen_colaborador(db.usuario(u["id"])))
 

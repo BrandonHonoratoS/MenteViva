@@ -182,6 +182,7 @@ class LLM:
                 herramientas: list[dict] | None = None, usuario_id: int | None = None, sesion_id: int | None = None,
                 reintentos: int = 2) -> Respuesta:
         """Genera una respuesta. `contents` = [{"role": "user"|"model", "text": "..."}] o partes de función.
+        Un elemento puede traer además "inline": [{"mime": "audio/webm", "data": bytes}] (audio o imagen) que viaja junto al texto.
 
         - `schema`: JSON Schema de la salida (se fuerza response_mime_type=application/json).
         - `grounding`: activa Google Search; incompatible con `herramientas` en la misma llamada.
@@ -198,8 +199,10 @@ class LLM:
         inicio = time.time()
         if self.simulado:
             texto, js = _stub_responder(origen, schema, contents)
-            STUB_LLAMADAS.append({"origen": origen, "modelo": modelo, "system": system, "contents": contents, "schema": schema, "grounding": grounding})
-            r = Respuesta(texto=texto, json=js, modelo=modelo, tok_in=len(system) // 4 + sum(len(c.get("text", "")) for c in contents) // 4,
+            STUB_LLAMADAS.append({"origen": origen, "modelo": modelo, "system": system, "contents": [{k: v for k, v in c.items() if k != "inline"} | ({"adjuntos": len(c["inline"])} if c.get("inline") else {}) for c in contents],
+                                  "schema": schema, "grounding": grounding})
+            adj = sum((32 * 60 if a.get("mime", "").startswith("audio") else 260) for c in contents for a in (c.get("inline") or []))
+            r = Respuesta(texto=texto, json=js, modelo=modelo, tok_in=len(system) // 4 + sum(len(c.get("text", "")) for c in contents) // 4 + adj,
                           tok_out=len(texto) // 4, ms=1)
             if grounding:
                 r.fuentes = [{"titulo": "Fuente simulada", "url": "https://example.org/simulado", "dominio": "example.org"}]
@@ -228,7 +231,9 @@ class LLM:
                 partes_contents.append(types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(
                     name=c["function_call"]["name"], args=c["function_call"]["args"]))]))
             else:
-                partes_contents.append(types.Content(role=c.get("role", "user"), parts=[types.Part(text=c.get("text", ""))]))
+                partes = [types.Part.from_bytes(data=a["data"], mime_type=a["mime"]) for a in (c.get("inline") or []) if a.get("data")]
+                partes.append(types.Part(text=c.get("text", "")))
+                partes_contents.append(types.Content(role=c.get("role", "user"), parts=partes))
 
         cfg: dict[str, Any] = {"system_instruction": system, "temperature": temperatura, "max_output_tokens": max_tokens,
                                "safety_settings": [types.SafetySetting(category=cat, threshold="BLOCK_ONLY_HIGH") for cat in (

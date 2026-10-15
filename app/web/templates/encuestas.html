@@ -8,20 +8,26 @@
   <div class="card stat"><span class="l">NPS</span><span class="v">{{ r.nps if r.nps is not none else '—' }}</span><span class="d muted">promotores − detractores</span></div>
   <div class="card stat"><span class="l">Aprendieron algo aplicable</span><span class="v">{{ r.aprendizaje.get('Sí, claramente', 0) + r.aprendizaje.get('Algo', 0) }}</span><span class="d muted">{% for k, v in r.aprendizaje.items() %}{{ k }} {{ v }}{{ ' · ' if not loop.last }}{% endfor %}</span></div>
 </div>
+<div class="grid g4 mb">
+  <div class="card stat"><span class="l">Utilidad percibida</span><span class="small" style="font-weight:600;display:block;margin:6px 0 2px">{% for k, v in r.utilidad.items() %}{{ k }} ({{ v }}){{ ' · ' if not loop.last }}{% else %}—{% endfor %}</span></div>
+  <div class="card stat"><span class="l">Lo que más valoran</span><span class="small" style="font-weight:600;display:block;margin:6px 0 2px">{% for k, v in r.valora.items() %}{{ k }} ({{ v }}){{ ', ' if not loop.last }}{% else %}—{% endfor %}</span></div>
+  <div class="card stat"><span class="l">Frecuencia deseada</span><span class="small" style="font-weight:600;display:block;margin:6px 0 2px">{% for k, v in r.frecuencia.items() %}{{ k }} ({{ v }}){{ ' · ' if not loop.last }}{% else %}—{% endfor %}</span></div>
+  <div class="card stat"><span class="l">Relación · veces de uso</span><span class="small" style="font-weight:600;display:block;margin:6px 0 2px">{% for k, v in r.relacion.items() %}{{ k }} ({{ v }}){{ ' · ' if not loop.last }}{% else %}—{% endfor %}</span><span class="d muted">{% for k, v in r.veces_uso.items() %}{{ k }} {{ v }}{{ ' · ' if not loop.last }}{% endfor %}</span></div>
+</div>
 {% if incluir_precio %}
 <div class="grid g4 mb">
-  <div class="card stat"><span class="l">¿Pagarían?</span><span class="v" style="font-size:1.1rem">{% for k, v in r.pagaria.items() %}{{ k }} {{ v }}{{ ' · ' if not loop.last }}{% else %}—{% endfor %}</span><span class="d muted">pago único promedio: {{ r.precio_unico|num(0) if r.precio_unico else '—' }} MXN</span></div>
-  <div class="card stat"><span class="l">Plan mensual</span><span class="v" style="font-size:1.1rem">{% for k, v in r.plan_mensual.items() %}{{ k }} {{ v }}{{ ' · ' if not loop.last }}{% else %}—{% endfor %}</span><span class="d muted">{% for k, v in r.precio_mensual.items() %}{{ k }}: {{ v }}{{ ' · ' if not loop.last }}{% endfor %}</span></div>
-  <div class="card stat"><span class="l">¿Quién paga?</span><span class="v" style="font-size:1.1rem">{% for k, v in r.quien_paga.items() %}{{ k }} {{ v }}{{ ' · ' if not loop.last }}{% else %}—{% endfor %}</span></div>
-  <div class="card stat"><span class="l">Pagarían más por</span><span class="v" style="font-size:.95rem">{% for k, v in r.funciones.items() %}{{ k }} ({{ v }}){{ ', ' if not loop.last }}{% else %}—{% endfor %}</span></div>
+  <div class="card stat"><span class="l">¿Pagarían?</span><span class="small" style="font-weight:600;display:block;margin:6px 0 2px">{% for k, v in r.pagaria.items() %}{{ k }} {{ v }}{{ ' · ' if not loop.last }}{% else %}—{% endfor %}</span><span class="d muted">pago único promedio: {{ r.precio_unico|num(0) if r.precio_unico else '—' }} MXN</span></div>
+  <div class="card stat"><span class="l">Monto mensual máximo</span><span class="small" style="font-weight:600;display:block;margin:6px 0 2px">{% for k, v in r.monto_mensual.items() %}{{ k }} ({{ v }}){{ ' · ' if not loop.last }}{% else %}—{% endfor %}</span><span class="d muted">modalidad: {% for k, v in r.modalidad_pago.items() %}{{ k }} {{ v }}{{ ' · ' if not loop.last }}{% endfor %} · cuándo: {% for k, v in r.cuando_pagar.items() %}{{ k }} {{ v }}{{ ' · ' if not loop.last }}{% endfor %}</span></div>
+  <div class="card stat"><span class="l">¿Quién paga?</span><span class="small" style="font-weight:600;display:block;margin:6px 0 2px">{% for k, v in r.quien_paga.items() %}{{ k }} {{ v }}{{ ' · ' if not loop.last }}{% else %}—{% endfor %}</span></div>
+  <div class="card stat"><span class="l">Pagarían más por</span><span class="small" style="font-weight:600;display:block;margin:6px 0 2px">{% for k, v in r.funciones.items() %}{{ k }} ({{ v }}){{ ', ' if not loop.last }}{% else %}—{% endfor %}</span></div>
 </div>
 {% endif %}
 <div class="card"><h2>Respuestas</h2>
-  <table><thead><tr><th>Fecha</th><th>Persona</th>{% if u.rol == 'superadmin' %}<th>Empresa</th>{% endif %}<th class="tright">Calif.</th><th class="tright">NPS</th><th>Lo que más gustó</th><th>Qué mejorar</th><th>Falló</th>{% if incluir_precio %}<th>Pagaría</th><th>Mensual</th>{% endif %}<th>Entrevista</th></tr></thead><tbody>
+  <table><thead><tr><th>Fecha</th><th>Persona</th>{% if u.rol == 'superadmin' %}<th>Empresa</th>{% endif %}<th class="tright">Calif.</th><th class="tright">NPS</th><th>Lo que más gustó</th><th>Qué mejorar</th><th>Falló</th>{% if incluir_precio %}<th>Pagaría</th><th>Mensual</th>{% endif %}<th>Entrevista</th><th></th></tr></thead><tbody>
   {% for e in lista %}{% set a = e.respuestas %}<tr><td class="small">{{ e.creado_en|fecha_corta }}</td><td><b>{{ e.usuario_nombre }}</b><div class="muted tiny">{{ e.puesto }} · {{ e.area_nombre or '—' }}</div></td>{% if u.rol == 'superadmin' %}<td class="small">{{ e.empresa_nombre }}</td>{% endif %}
     <td class="tright">{{ a.calificacion }}</td><td class="tright">{{ a.nps }}</td><td class="small">{{ a.gusto }}</td><td class="small">{{ a.mejora }}</td><td class="small muted">{{ a.fallo or '—' }}</td>
-    {% if incluir_precio %}<td class="small">{{ a.pagaria }}{% if a.precio_unico %} · {{ a.precio_unico|num(0) }} MXN{% endif %}</td><td class="small">{{ a.plan_mensual }}{% if a.precio_mensual %} · {{ a.precio_mensual }}{% endif %}</td>{% endif %}
-    <td class="small">{{ a.entrevista }}</td></tr>
-  {% else %}<tr><td colspan="12" class="empty">Aún no hay respuestas. La encuesta aparece a cada persona después de su primera práctica.</td></tr>{% endfor %}
+    {% if incluir_precio %}<td class="small">{{ a.pagaria }}{% if a.precio_unico %} · {{ a.precio_unico|num(0) }} MXN{% endif %}</td><td class="small">{{ a.monto_mensual or a.plan_mensual or '—' }}{% if a.modalidad_pago %} · {{ a.modalidad_pago }}{% endif %}</td>{% endif %}
+    <td class="small">{{ a.entrevista }}</td><td><a class="btn sm" style="white-space:nowrap" href="{{ '/admin/encuestas/' if u.rol == 'superadmin' else '/encuestas/' }}{{ e.id }}">Ver todo</a></td></tr>
+  {% else %}<tr><td colspan="13" class="empty">Aún no hay respuestas. La encuesta aparece a cada persona después de su primera práctica.</td></tr>{% endfor %}
   </tbody></table></div>
 {% endblock %}

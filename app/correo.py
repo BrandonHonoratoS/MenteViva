@@ -10,6 +10,7 @@ from __future__ import annotations
 import html
 import logging
 import smtplib
+import socket
 import threading
 import time
 from email.message import EmailMessage
@@ -21,6 +22,25 @@ from .config import settings
 log = logging.getLogger("mv.correo")
 _ULTIMO_ERROR = {"t": 0.0}
 ENVIADOS_PRUEBA: list[dict] = []   # en modo prueba (sin SMTP) se registran aquí en vez de enviarse
+
+
+def _ipv4(host: str) -> str:
+    """Resuelve el host a IPv4. Algunos hosts (Render) anuncian IPv6 sin ruta de salida y smtplib falla con 'Network is unreachable'."""
+    try:
+        return socket.getaddrinfo(host, None, socket.AF_INET, socket.SOCK_STREAM)[0][4][0]
+    except Exception:  # noqa: BLE001
+        return host
+
+
+class _SMTP(smtplib.SMTP):
+    def _get_socket(self, host, port, timeout):
+        return socket.create_connection((_ipv4(host), port), timeout, self.source_address)
+
+
+class _SMTP_SSL(smtplib.SMTP_SSL):
+    def _get_socket(self, host, port, timeout):
+        sock = socket.create_connection((_ipv4(host), port), timeout, self.source_address)
+        return self.context.wrap_socket(sock, server_hostname=self._host)   # el certificado se valida con el nombre, no con la IP
 
 
 def activo() -> bool:
@@ -53,11 +73,11 @@ def enviar(destinatario: str, asunto: str, titulo: str, cuerpo: str, enlace: str
     msg.add_alternative(_html(titulo, cuerpo, enlace, nombre or destinatario), subtype="html")
     try:
         if settings.SMTP_SSL or settings.SMTP_PORT == 465:
-            with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as s:
+            with _SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as s:
                 s.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
                 s.send_message(msg)
         else:
-            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as s:
+            with _SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as s:
                 s.ehlo()
                 s.starttls()
                 s.login(settings.SMTP_USER, settings.SMTP_PASSWORD)

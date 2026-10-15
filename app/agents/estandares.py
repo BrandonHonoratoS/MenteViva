@@ -13,7 +13,7 @@ from .. import db
 from . import catalogo as C
 
 CAMPOS_HABILIDAD = [
-    ("metodologia", "Metodología y etapas que usan", "Ej. Vendemos con AIDA (Atención → Interés → Deseo → Acción). No usamos PRAINCODERECI. El cierre siempre con una propuesta por escrito."),
+    ("metodologia", "Metodología y etapas que usan", "Ej. Vendemos con AIDA (Atención → Interés → Deseo → Acción). No usamos PRAINCODERECI. El cierre siempre con una propuesta por escrito. / Ej. Presentaciones de máximo 5 láminas con una gráfica por idea. / Ej. Código de vestimenta business casual de lunes a jueves y smart casual los viernes; en cliente, formal."),
     ("terminologia", "Terminología, reglas y criterios propios", "Ej. Llamamos 'sondeo' al diagnóstico; nunca se ofrece descuento sin aprobación del gerente; el seguimiento es a las 24 h."),
     ("no_evaluar", "Qué NO se debe exigir ni evaluar", "Ej. No exigir técnicas de PNL ni silencio activo; no penalizar hablar de precio al inicio si el cliente lo pide."),
 ]
@@ -26,6 +26,10 @@ DEFAULTS = {
     "ventas": "Clínica de Ventas CAT-01 v3.0: ciclo PRAINCODERECI, diagnóstico SPIN, técnicas T-01…T-08, KPI-1…KPI-6.",
     "entrevistas": "Entrevista por competencias BEI + STAR con 5 KPIs (estructura, especificidad, autoconciencia, comunicación, ajuste).",
     "ruta_dm": "Ruta Delivery Manager de Ingeniería Cóndor (7 niveles) y Laboratorio DM: escucha activa, estrés, PMBOK y comunicación ejecutiva.",
+    "presentaciones": "Programa Presentaciones de Alto Impacto (Capital Intelectual · Cóndor): rúbrica de 9 criterios (apertura, síntesis, estructura, voz, muletillas, interacción, vocabulario, cierre, tiempo); Duarte, Heath, Lucas, Toastmasters.",
+    "imagen": "Guía de 5 códigos de vestimenta (formal, business casual, smart casual, casual, viernes), medidas y ajuste, perfume, etiqueta y buenos modales, imagen vendedora (7 segundos) y neuroventas.",
+    "comunicacion": "Comunicación no violenta (Rosenberg), escucha activa (Rogers), asertividad (DESC, mensajes 'yo'), conversaciones difíciles y acuerdos; Gottman para familia.",
+    "liderazgo": "Grid gerencial (directivo, productor, complaciente, indiferente), liderazgo situacional, pentágono del poder, cambio (Lewin, Kotter), retroalimentación y delegación (diplomado Lean Progress).",
 }
 
 

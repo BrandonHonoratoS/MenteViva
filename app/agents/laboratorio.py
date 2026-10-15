@@ -88,7 +88,10 @@ BASE_CONOCIMIENTO = {
 
 
 def base_conocimiento_texto() -> str:
-    return "\n\n".join(f"[{d['nombre'].upper()}]\n{BASE_CONOCIMIENTO[d['id']]}" for d in DIMENSIONES)
+    from . import conocimiento as K
+    partes = [f"[{d['nombre'].upper()}]\n{BASE_CONOCIMIENTO[d['id']]}" for d in DIMENSIONES]
+    partes.append("[GESTIÓN DE PROYECTOS · DIPLOMADO LEAN PROGRESS (complementa la Guía PMBOK)]\n" + K.DIPLOMADO_PM)
+    return "\n\n".join(partes)
 
 
 ESCALA = [

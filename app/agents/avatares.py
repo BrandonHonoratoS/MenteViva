@@ -23,6 +23,14 @@ AVATARES = {
                 "descripcion": "Una clienta analítica que no compra por simpatía: revela si dominas la venta o improvisas."},
     "juan": {"nombre": "Juan Artiaga", "rol": "Mentor · Ruta Delivery Manager", "color": "#10B981", "inicial": "J",
              "descripcion": "Diagnostica tu nivel DM y entrena, con roleplay, casos o retos, las competencias del siguiente nivel."},
+    "valeria": {"nombre": "Valeria Campos", "rol": "Audiencia exigente · Presentaciones de alto impacto", "color": "#F59E0B", "inicial": "V",
+                "descripcion": "Es tu público: escucha, pregunta, objeta y se distrae si pierdes el hilo. Graba tu voz y mide apertura, síntesis, voz, muletillas, interacción, cierre y tiempo."},
+    "renata": {"nombre": "Renata Solís", "rol": "Consultora de imagen y etiqueta", "color": "#D946EF", "inicial": "R",
+               "descripcion": "Te pone en situaciones reales (cliente, dirección, entrevista, comida de negocios) y evalúa tu outfit —descrito o en foto— y tus modales con los cinco códigos de vestimenta."},
+    "mateo": {"nombre": "Mateo Ibarra", "rol": "Interlocutor · comunicación cotidiana", "color": "#EC4899", "inicial": "M",
+              "descripcion": "Interpreta a la persona con quien necesitas hablar (pareja, hijo, jefe, vecino, cliente) y revela si comunicas con claridad, escucha, asertividad y acuerdo."},
+    "patricia": {"nombre": "Patricia Navarro", "rol": "Integrante del equipo · Liderazgo", "color": "#10B981", "inicial": "P",
+                 "descripcion": "Es la persona de tu equipo que hay que dirigir, escuchar, corregir o convencer; mide tu claridad, adaptación situacional, retroalimentación, decisión y gestión del cambio."},
     "analista": {"nombre": "El Analista", "rol": "Inteligencia de desarrollo", "color": "#F59E0B", "inicial": "A",
                  "descripcion": "Lee todas las sesiones, recalcula planes y niveles, y orienta a líderes y RRHH con evidencia."},
 }
@@ -153,6 +161,17 @@ class Celeste:
         return round(s, 1)
 
 
+def _materiales_dm(competencia: str) -> str:
+    """Base del diplomado de administración de proyectos (y de liderazgo) para las competencias de la Ruta DM que la usan; vacío para el resto."""
+    from . import conocimiento as K
+    partes = []
+    if competencia in ("PMBOK", "Scrum", "Toma de decisiones", "Administración de recursos", "PMO", "Gestión del cambio", "Finanzas", "ROI", "Accountability", "Autogestión", "Innovación operativa"):
+        partes.append(K.DIPLOMADO_PM)
+    if competencia in ("Delegación", "Desarrollo gerencial", "Gestión del cambio", "Retroalimentación", "Influencia", "Gestión de conflictos"):
+        partes.append(K.LIDERAZGO)
+    return ("MATERIALES DE REFERENCIA (diseña, observa y evalúa conductas con esta base; no exijas que la persona cite nombres):\n" + "\n\n".join(partes) + "\n") if partes else ""
+
+
 # ── Juan Artiaga ─────────────────────────────────────────────────────────────
 class Juan:
     id = "juan"
@@ -166,7 +185,7 @@ class Juan:
         hist = "; ".join(f"{h['fecha'][:10]}: {h['score']}/10 ({h['dominio']})" for h in historial[-3:]) or "sin sesiones previas en esta competencia"
         return (P.JUAN_DISENO.format(nivel_actual=nivel_actual, nivel_siguiente=sig, valor_siguiente=C.valor_dm(sig), competencia=comp,
                                      formato_sugerido=C.formato_sugerido(comp), perfil=_texto_perfil(usuario, perfil.get("onboarding", {}), perfil.get("diagnostico"), incluir_ventas=False),
-                                     objetivo=sesion.get("objetivo") or f"entrenar {comp} para el siguiente nivel", historial=hist), E.JUAN_DISENO)
+                                     objetivo=sesion.get("objetivo") or f"entrenar {comp} para el siguiente nivel", historial=hist, materiales=_materiales_dm(comp)), E.JUAN_DISENO)
 
     @staticmethod
     def system(sesion: dict, usuario: dict, perfil: dict) -> str:
@@ -193,7 +212,7 @@ class Juan:
         return (P.FEEDBACK_DM.format(titulo=esc.get("titulo", "Sesión"), formato=esc.get("formato", "roleplay"), competencia=sesion.get("competencia") or "",
                                      nivel_siguiente=sig, valor_siguiente=C.valor_dm(sig), nivel_actual=nivel_actual,
                                      subdimensiones=", ".join(esc.get("subdimensiones") or []), competencias_siguiente=", ".join(C.competencias_dm(sig)),
-                                     reglas=P.REGLAS_FEEDBACK, estandar=ES.bloque(sesion.get("empresa_id"), None)), E.FEEDBACK_DM)
+                                     reglas=P.REGLAS_FEEDBACK, estandar=ES.bloque(sesion.get("empresa_id"), None), materiales=_materiales_dm(sesion.get("competencia") or "")), E.FEEDBACK_DM)
 
     @staticmethod
     def score(resultado: dict, sesion: dict) -> float:
@@ -205,11 +224,101 @@ class Juan:
         return round(float(resultado.get("score_global") or 0) * 10, 1)
 
 
+# ── Avatares genéricos por KPI (Valeria, Renata, Mateo, Patricia) ────────────
+class Generico:
+    """Avatar de un escenario definido por su configuración en prompts.ESCENARIOS y su rúbrica de KPIs en el catálogo.
+    Diseña la escena una vez (con la base de conocimiento), conversa barato por turnos y evalúa al final con la misma base."""
+    generico = True
+    schema_turno = E.TURNO_GENERICO
+
+    def __init__(self, habilidad_id: str) -> None:
+        self.habilidad_id = habilidad_id
+        self.hab = C.HABILIDADES[habilidad_id]
+        self.id = self.hab["agente"]
+        self.cfg = P.ESCENARIOS[habilidad_id]
+
+    def _base(self) -> str:
+        from . import conocimiento as K
+        return K.base(self.habilidad_id)
+
+    def _nivel(self, sesion: dict) -> str:
+        return sesion.get("nivel") or self.hab["niveles"][0]
+
+    def prompt_diseno(self, sesion: dict, usuario: dict, perfil: dict, historial: list[dict]) -> tuple[str, dict]:
+        nivel = self._nivel(sesion)
+        hist = "; ".join(f"{h['fecha'][:10]}: {h['score']}" for h in historial[-3:]) or "sin sesiones previas"
+        extra = ""
+        if self.hab.get("test") == "liderazgo":
+            est = (sesion.get("escenario") or {}).get("estilo_test") or {}
+            if est.get("predominante"):
+                extra = f" Estilo de liderazgo según el test (grid gerencial): {est['predominante']} — {est.get('lectura', '')}. Diseña una escena que lo rete a flexibilizar hacia el estilo situacional."
+        return (P.GENERICO_DISENO.format(identidad=self.cfg["identidad"], base=self._base(), tipos=self.cfg["tipos"], nivel=nivel,
+                                         config_nivel=self.cfg["niveles"].get(nivel, ""), perfil=_texto_perfil(usuario, perfil.get("onboarding", {}), perfil.get("diagnostico"), incluir_ventas=self.habilidad_id in ("imagen", "presentaciones")) + extra,
+                                         objetivo=sesion.get("objetivo") or f"practicar {self.hab['nombre'].lower()} en una situación real", historial=hist,
+                                         estandar=ES.bloque(sesion.get("empresa_id"), self.habilidad_id)), E.DISENO_GENERICO)
+
+    def system(self, sesion: dict, usuario: dict, perfil: dict) -> str:
+        esc = sesion.get("escenario") or {}
+        nivel = self._nivel(sesion)
+        return P.GENERICO_SESION.format(identidad=self.cfg["identidad"], reglas=self.cfg["reglas"], nivel=nivel, config_nivel=self.cfg["niveles"].get(nivel, ""),
+                                        titulo=esc.get("titulo", "Práctica"), personaje=esc.get("personaje") or self.hab["avatar"], situacion=esc.get("situacion", ""),
+                                        tarea=esc.get("tarea") or "conversar la situación hasta resolverla", estandar=ES.bloque(sesion.get("empresa_id"), self.habilidad_id),
+                                        objetivo=sesion.get("objetivo") or "—")
+
+    def schema_para(self, sesion: dict) -> dict:
+        return E.TURNO_GENERICO
+
+    def apertura(self, sesion: dict) -> tuple[str | None, str]:
+        esc = sesion.get("escenario") or {}
+        return (esc.get("primer_mensaje") or None), "(Comienza la escena con tu primer turno e indica claramente qué debe hacer ahora la persona.)"
+
+    def prompt_feedback(self, sesion: dict) -> tuple[str, dict]:
+        esc = sesion.get("escenario") or {}
+        nivel = self._nivel(sesion)
+        extra = self.cfg.get("feedback_extra", "")
+        if self.hab.get("test") == "liderazgo" and (esc.get("estilo_test") or {}).get("predominante"):
+            extra += f" ESTILO DE LIDERAZGO del test: {esc['estilo_test']['predominante']} ({esc['estilo_test'].get('lectura', '')})."
+        return (P.FEEDBACK_GENERICO.format(avatar=self.hab["avatar"], habilidad=self.hab["nombre"].lower(), base=self._base(), kpis=_kpis_texto(self.hab, nivel), feedback_extra=extra,
+                                           titulo=esc.get("titulo", "—"), tarea=esc.get("tarea") or "—", nivel=nivel, objetivo=sesion.get("objetivo") or "—",
+                                           estandar=ES.bloque(sesion.get("empresa_id"), self.habilidad_id), reglas=P.REGLAS_FEEDBACK), E.feedback_generico(len(self.hab["kpis"])))
+
+    def score(self, resultado: dict, sesion: dict) -> float:
+        kpis = [k for k in resultado.get("kpis", []) if k.get("evaluable", True)]
+        pesos = self.hab["pesos"].get(self._nivel(sesion)) or self.hab["pesos"][self.hab["niveles"][0]]
+        total = sum(pesos.get(k["id"], 0) for k in kpis) or 100
+        return round(sum(float(k.get("score", 0)) * pesos.get(k.get("id", ""), 0) for k in kpis) / total, 1)
+
+
 AGENTES = {"elena": Elena, "celeste": Celeste, "juan": Juan}
+for _hid, _h in C.HABILIDADES.items():
+    if _h["agente"] not in AGENTES:
+        AGENTES[_h["agente"]] = Generico(_hid)
 
 
 def agente_para(habilidad_id: str):
     return AGENTES[C.HABILIDADES[habilidad_id]["agente"]]
+
+
+def es_generico(agente) -> bool:
+    return bool(getattr(agente, "generico", False))
+
+
+def nota_adjunto(meta: dict | None) -> str:
+    """Resumen entre corchetes de una grabación o foto adjunta a un mensaje (lo que ven el avatar y el análisis final)."""
+    meta = meta or {}
+    a = meta.get("audio")
+    if a:
+        m, s = divmod(int(a.get("duracion_s") or 0), 60)
+        return (f"[Grabación de voz · {m}:{s:02d} · {a.get('ppm', 0)} palabras/min · {a.get('muletillas', 0)} muletillas ({a.get('muletillas_min', 0)}/min) · "
+                f"pausas largas {a.get('pausas_largas', 0)} · ritmo {a.get('ritmo')} · variedad vocal {a.get('variedad_vocal')} · volumen {a.get('volumen')} · "
+                f"energía al cierre: {a.get('energia_cierre')} · seguridad {a.get('seguridad')}/4 · {a.get('observaciones_voz', '')}]")
+    f = meta.get("foto")
+    if f:
+        if not f.get("es_outfit", True):
+            return "[Foto enviada: no muestra vestimenta]"
+        return (f"[Foto ({f.get('nota_privacidad') or 'imagen'}) · código detectado: {f.get('codigo_detectado')} · {f.get('descripcion', '')} · Ajuste: {f.get('ajuste', '')} · "
+                f"Cuidado: {f.get('cuidado', '')} · Color: {f.get('color', '')} · Accesorios: {f.get('accesorios', '')} · Sin ver: {', '.join(f.get('detalles_a_revisar') or []) or '—'}]")
+    return ""
 
 
 def transcript_texto(mensajes: list[dict], nombre_usuario: str, nombre_avatar: str) -> str:
@@ -218,7 +327,8 @@ def transcript_texto(mensajes: list[dict], nombre_usuario: str, nombre_avatar: s
     for m in mensajes:
         if m["rol"] == "usuario":
             turno += 1
-            out.append(f"[{turno}] {nombre_usuario}: {m['texto']}")
+            nota = nota_adjunto(m.get("meta"))
+            out.append(f"[{turno}] {nombre_usuario}: {(nota + ' ') if nota else ''}{m['texto']}")
         elif m["rol"] == "avatar":
             out.append(f"    {nombre_avatar}: {m['texto']}")
     return "\n".join(out)

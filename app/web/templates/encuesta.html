@@ -2,8 +2,10 @@
 {% block subtitulo %}Eres de las primeras personas en vivir Mente Viva: tu opinión define lo que construimos (3–4 minutos){% endblock %}
 {% block content %}
 {% if hecha %}
-<div class="card hero"><h2>¡Gracias, {{ u.nombre.split(' ')[0] }}!</h2><p class="muted">Ya registramos tu experiencia. Si quieres agregar algo más, escríbele al equipo desde el botón de Ayuda.</p><a class="btn primary mt" href="/hoy">Volver a Hoy</a></div>
+<div class="card hero"><h2>¡Gracias, {{ u.nombre.split(' ')[0] }}!</h2><p class="muted">{{ gracias }}</p><p class="muted small">Si quieres agregar algo más, escríbele al equipo desde el botón de Ayuda.</p><a class="btn primary mt" href="/hoy">Volver a Hoy</a></div>
 {% else %}
+{% if obligatoria %}<div class="alert warn mb"><b>Antes de tu siguiente práctica, cuéntanos cómo fue la primera.</b> Son 4 minutos y es la base con la que mejoramos Mente Viva para ti.</div>{% endif %}
+<div class="card mb"><p class="small" style="margin:0">{{ intro }}</p></div>
 {% if faltan %}<div class="alert err mb">Faltan respuestas en: {{ faltan|length }} pregunta{{ 's' if faltan|length != 1 }} (marcadas en rojo).</div>{% endif %}
 <form method="post" action="/encuesta" class="stack">
   <input type="hidden" name="csrf" value="{{ csrf }}">

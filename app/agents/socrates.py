@@ -40,6 +40,41 @@ TEMAS_VENTAS = [
     ("Cierre y siguiente paso", "Tipos de cierre, señales de compra, silencio activo y compromisos con fecha"),
     ("Postventa y cuentas que crecen", "Onboarding del cliente, referidos y expansión"),
 ]
+TEMAS_PRESENTACIONES = [
+    ("El arte de comunicar una idea", "Propósito, audiencia y mensaje; estructura apertura–desarrollo–cierre; una idea central y tres puntos (Heath, Duarte, Lucas)"),
+    ("Aperturas que captan la atención", "Cinco formas de abrir en 30 segundos, conectar necesidad → relevancia → beneficio y los errores que pierden a la audiencia"),
+    ("La voz como herramienta de impacto", "Volumen, dicción, ritmo, pausas y énfasis; detectar y reducir muletillas; variedad vocal con intención"),
+    ("Seguridad, fluidez y dominio del mensaje", "Preparación mental, respiración y postura; palabras clave en vez de memorizar; qué hacer al perder el hilo; vocabulario preciso"),
+    ("De explicar funcionalidades a comunicar valor", "Funcionalidad → beneficio → impacto esperado; descubrir la necesidad antes de explicar; evidencia que respalda (Rackham, Cialdini)"),
+    ("Interacción, comprensión y manejo de preguntas", "Validar comprensión con evidencia, escuchar antes de responder, R-C-E-C, qué hacer cuando no sabes y cómo responder objeciones"),
+    ("Cómo construir un cierre memorable", "Cinco elementos del cierre, cuatro tipos según el objetivo, la última frase y la energía final"),
+    ("La presentación integral de alto impacto", "Checklist de preparación, rúbrica de 9 criterios, retroalimentación mantener–mejorar–practicar y plan individual"),
+]
+TEMAS_IMAGEN = [
+    ("Los cinco códigos de vestimenta", "Formal de negocios, business casual, smart casual, casual y casual viernes: cuándo, qué proyecta cada uno y qué se excluye"),
+    ("Ajuste y medidas: el traje, la camisa y el pantalón", "Hombro, puño, caída del pantalón, calcetín, cinturón y zapatos; la talla importa más que la marca"),
+    ("Falda, vestido, calzado y accesorios con criterio", "Largos correctos, escote discreto, tacón moderado o zapato bajo elegante, joyería y bolso; ir de pantalón también es formal"),
+    ("Color, combinación y cuidado de las prendas", "Neutros de base, un acento, coherencia; planchado, calzado lustrado, grooming y los detalles que delatan"),
+    ("Perfume, grooming y los primeros 7 segundos", "Cómo y cuándo aplicar fragancia, postura, mirada, sonrisa y tono: la imagen vendedora y las neuroventas (Klarić)"),
+    ("Etiqueta y buenos modales en los negocios", "Puntualidad, saludos, presentaciones, 'usted', celular, comida de negocios y videollamadas"),
+]
+TEMAS_COMUNICACION = [
+    ("Comunicación no violenta: observar, sentir, necesitar, pedir", "El modelo de Rosenberg para pedir sin reclamar en casa y en el trabajo"),
+    ("Escucha activa y validación", "Parafrasear, nombrar la emoción, preguntar antes de responder; validar no es dar la razón (Rogers)"),
+    ("Asertividad: ni agredir ni ceder", "Mensajes 'yo', DESC, disco rayado, banco de niebla y cómo decir que no"),
+    ("Conversaciones difíciles y acuerdos", "Propósito común, hechos antes que conclusiones, seguridad en el diálogo y cierre con responsables y fechas"),
+    ("Comunicarse en pareja y en familia", "Los cuatro jinetes de Gottman y sus antídotos; pausas fisiológicas; límites con hijos y familia extendida"),
+    ("Claridad y estructura al hablar", "Idea principal primero, PREP, mensaje en tres ideas y verificación de comprensión"),
+]
+TEMAS_LIDERAZGO = [
+    ("Qué es un líder y el grid gerencial", "Tarea vs. personas: directivo, productor, complaciente, indiferente y el estilo de equipo (Blake & Mouton)"),
+    ("Liderazgo situacional", "Dirigir, persuadir, participar y delegar según la madurez de cada persona (Hersey & Blanchard)"),
+    ("El pentágono del poder", "Poder legítimo, experto, carismático, premiador y coercitivo: con qué sostener la autoridad (French & Raven)"),
+    ("Delegar y dar retroalimentación", "Objetivo, responsable, fecha y criterio de éxito; feedback de conducta sin etiquetas; reconocer en público y corregir en privado"),
+    ("Gestión del cambio: Lewin y Kotter", "Fuerzas impulsoras y restrictivas, descongelar–cambiar–recongelar y los ocho pasos de Kotter"),
+    ("Liderar bajo presión y con equipos ágiles", "Decidir con evidencia, repartir carga, cuidar la fatiga; el líder servicial del Scrum Master"),
+]
+TEMAS_POR_HABILIDAD = {"presentaciones": TEMAS_PRESENTACIONES, "imagen": TEMAS_IMAGEN, "comunicacion": TEMAS_COMUNICACION, "liderazgo": TEMAS_LIDERAZGO}
 TEMAS_ENTREVISTAS = [
     ("Entrevista por competencias (BEI) y método STAR", "Cómo se construye una historia que demuestra una competencia y cómo la lee un entrevistador experto"),
     ("Preparar tu banco de historias", "Inventario de logros, métricas y aprendizajes para cualquier competencia que te pregunten"),
@@ -55,6 +90,8 @@ def temas_biblioteca(habilidad_id: str, nivel_dm: str | None = None) -> list[dic
         out = [{"tema": t, "descripcion": d, "competencia": ""} for t, d in TEMAS_VENTAS]
     elif habilidad_id == "entrevistas":
         out = [{"tema": t, "descripcion": d, "competencia": ""} for t, d in TEMAS_ENTREVISTAS]
+    elif habilidad_id in TEMAS_POR_HABILIDAD:
+        out = [{"tema": t, "descripcion": d, "competencia": ""} for t, d in TEMAS_POR_HABILIDAD[habilidad_id]]
     elif habilidad_id == "ruta_dm":
         actual = nivel_dm or "DM Básico"
         sig = C.nivel_dm_siguiente(actual) or actual
@@ -71,6 +108,19 @@ _PALABRAS_TEMA = [
     (("propuesta", "valor", "present"), "Presentación de valor y propuesta"), (("postventa", "referid", "cuenta"), "Postventa y cuentas que crecen"),
     (("star", "historia", "bei"), "Entrevista por competencias (BEI) y método STAR"), (("banco", "logro", "inventario"), "Preparar tu banco de historias"),
     (("presión", "presion", "incómod", "incomod"), "Comunicación bajo presión en entrevistas"), (("oferta", "salario", "expectativ"), "Preguntas de cierre y negociación de oferta"),
+    (("apertura", "gancho", "abrir", "inicio"), "Aperturas que captan la atención"), (("voz", "muletilla", "ritmo", "pausa"), "La voz como herramienta de impacto"),
+    (("seguridad", "fluidez", "nervio"), "Seguridad, fluidez y dominio del mensaje"), (("valor", "beneficio", "funcionalidad"), "De explicar funcionalidades a comunicar valor"),
+    (("pregunta", "interac", "comprensi", "objeci"), "Interacción, comprensión y manejo de preguntas"), (("cierre", "cerrar", "siguiente paso", "memorable"), "Cómo construir un cierre memorable"),
+    (("integral", "final", "simulaci", "5 min"), "La presentación integral de alto impacto"), (("idea", "estructura", "síntesis", "sintesis", "claridad"), "El arte de comunicar una idea"),
+    (("código", "codigo", "formal", "casual"), "Los cinco códigos de vestimenta"), (("traje", "camisa", "pantal", "saco", "ajuste", "medida"), "Ajuste y medidas: el traje, la camisa y el pantalón"),
+    (("falda", "vestido", "tac", "zapato", "accesorio"), "Falda, vestido, calzado y accesorios con criterio"), (("color", "combina", "planch", "cuidado"), "Color, combinación y cuidado de las prendas"),
+    (("perfume", "fragancia", "7 segundos", "primera impresi"), "Perfume, grooming y los primeros 7 segundos"), (("etiqueta", "modales", "saludo", "mesa", "comida"), "Etiqueta y buenos modales en los negocios"),
+    (("no violenta", "pedir", "petici", "necesidad"), "Comunicación no violenta: observar, sentir, necesitar, pedir"), (("escuch", "valid", "parafras"), "Escucha activa y validación"),
+    (("asertiv", "límite", "limite", "decir no"), "Asertividad: ni agredir ni ceder"), (("difícil", "dificil", "acuerdo", "conflicto"), "Conversaciones difíciles y acuerdos"),
+    (("pareja", "familia", "hijo", "gottman"), "Comunicarse en pareja y en familia"), (("claridad", "estructura", "prep"), "Claridad y estructura al hablar"),
+    (("grid", "estilo", "directivo", "complaciente"), "Qué es un líder y el grid gerencial"), (("situacional", "madurez", "delegar", "dirigir"), "Liderazgo situacional"),
+    (("poder", "autoridad", "influencia"), "El pentágono del poder"), (("retroaliment", "feedback", "reconoc", "deleg"), "Delegar y dar retroalimentación"),
+    (("cambio", "kotter", "lewin", "resisten"), "Gestión del cambio: Lewin y Kotter"), (("presión", "presion", "ágil", "agil", "scrum", "fatiga"), "Liderar bajo presión y con equipos ágiles"),
 ]
 
 
@@ -79,7 +129,7 @@ def tema_para_item(habilidad_id: str, item: dict) -> str:
     if item.get("competencia"):
         return item["competencia"]
     obj = (item.get("objetivo") or "").lower()
-    temas = {t for t, _ in (TEMAS_VENTAS if habilidad_id == "ventas" else TEMAS_ENTREVISTAS if habilidad_id == "entrevistas" else [])}
+    temas = {t for t, _ in (TEMAS_VENTAS if habilidad_id == "ventas" else TEMAS_ENTREVISTAS if habilidad_id == "entrevistas" else TEMAS_POR_HABILIDAD.get(habilidad_id, []))}
     for claves, tema in _PALABRAS_TEMA:
         if tema in temas and any(k in obj for k in claves):
             return tema
@@ -118,8 +168,11 @@ def materiales_internos(habilidad_id: str, competencia: str = "", empresa_id: in
     est = ES.bloque(empresa_id, habilidad_id)
     if est:
         partes.append("ESTÁNDAR DE LA EMPRESA DE LA PERSONA (prioritario: enseña su metodología y sus términos; lo genérico de Mente Viva sólo como complemento cuando no contradiga):" + est)
+    from . import conocimiento as K
     if habilidad_id == "ventas":
         partes.append(CAT01_RESUMEN)
+        partes.append(K.OBJECIONES_TECNICOS)
+        partes.append("Imagen vendedora y neuroventas (resumen): " + K.IMAGEN.split("NEUROVENTAS")[-1][:1200])
     elif habilidad_id == "entrevistas":
         partes.append(ENTREVISTAS_RESUMEN)
     elif habilidad_id == "ruta_dm":
@@ -127,7 +180,17 @@ def materiales_internos(habilidad_id: str, competencia: str = "", empresa_id: in
         dim = _MAPA_DM_LAB.get(competencia)
         if dim and dim in L.BASE_CONOCIMIENTO:
             partes.append(f"Taller DM2 · {L.dimension(dim)['nombre']}:\n{L.BASE_CONOCIMIENTO[dim]}")
+        if competencia in _COMPETENCIAS_DIPLOMADO or not competencia:
+            partes.append(K.DIPLOMADO_PM)
+        if competencia in ("Delegación", "Desarrollo gerencial", "Gestión del cambio", "Retroalimentación", "Influencia", "Gestión de conflictos"):
+            partes.append(K.LIDERAZGO)
+    elif habilidad_id in K.BASES:
+        partes.append(K.base(habilidad_id))
     return "\n\n".join(partes)
+
+
+_COMPETENCIAS_DIPLOMADO = {"PMBOK", "Scrum", "Toma de decisiones", "Administración de recursos", "PMO", "Gestión del cambio", "Finanzas", "ROI", "Accountability",
+                           "Autogestión", "Gestión de clientes", "Innovación operativa"}
 
 
 # ── Contexto personal ───────────────────────────────────────────────────────

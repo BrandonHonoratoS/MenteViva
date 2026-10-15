@@ -25,12 +25,32 @@
     <div class="card">
       <h2>Puntuación por KPI</h2>
       {% for k in res.kpis %}{% set d = kpis_def.get(k.id, {}) %}
-      <div class="kpi-row">
-        <div><b>{{ k.id }} · {{ d.nombre or '' }}</b><div class="muted tiny">peso {{ pesos.get(k.id, 0) }} %</div></div>
+      <div class="kpi-row" {% if k.evaluable is defined and not k.evaluable %}style="opacity:.6"{% endif %}>
+        <div><b>{{ k.id }} · {{ d.nombre or '' }}</b><div class="muted tiny">{% if k.evaluable is defined and not k.evaluable %}no evaluado (sin grabación){% else %}peso {{ pesos.get(k.id, 0) }} %{% endif %}</div></div>
         <div><div class="bar"><i style="width:{{ k.score }}%"></i></div><div class="small mt" style="margin-top:6px"><b>Evidencia:</b> {{ k.evidencia }}</div><div class="small"><span class="up">✓</span> {{ k.bien }}</div><div class="small"><span class="down">→</span> {{ k.mejora }}</div></div>
         <div>{{ m.sem(k.score) }}</div>
       </div>{% endfor %}
       {% if res.metrica_etapa_debil %}<div class="alert info mt">Etapa débil declarada: {{ res.metrica_etapa_debil }}</div>{% endif %}
+    </div>
+    {% endif %}
+
+    {% if res.voz %}{% set v = res.voz %}
+    <div class="card"><h2>Tu voz en esta sesión</h2>
+      <div class="voz-grid">
+        <div class="stat"><span class="v">{{ v.grabaciones }}</span><span class="l">grabaciones</span><span class="d muted">{{ (v.duracion_s // 60) }}:{{ '%02d' % (v.duracion_s % 60) }} en total</span></div>
+        <div class="stat"><span class="v">{{ v.ppm }}</span><span class="l">palabras / min</span><span class="d muted">ritmo {{ v.ultimo_ritmo or '—' }}</span></div>
+        <div class="stat"><span class="v">{{ v.muletillas_min }}</span><span class="l">muletillas / min</span><span class="d muted">{{ v.muletillas }} en total · {{ '≤1 alto impacto · 2–3 competente · 4–6 en desarrollo · >6 inicial' }}</span></div>
+        <div class="stat"><span class="v">{{ v.seguridad }}<small>/4</small></span><span class="l">seguridad</span><span class="d muted">variedad vocal {{ v.ultima_variedad or '—' }} · cierre: {{ v.ultima_energia or '—' }}</span></div>
+        <div class="stat"><span class="v">{{ v.pausas_largas }}</span><span class="l">pausas largas</span><span class="d muted">> 2 s</span></div>
+      </div>
+      <p class="muted tiny mt">Medido por la IA sobre tus grabaciones; el audio no se conserva. Compara estos números sesión a sesión.</p>
+    </div>
+    {% endif %}
+    {% if res.mantener_mejorar_practicar and res.mantener_mejorar_practicar.mantener %}{% set mmp = res.mantener_mejorar_practicar %}
+    <div class="grid g3">
+      <div class="card"><div class="cap">Mantener</div><p class="small">{{ mmp.mantener }}</p></div>
+      <div class="card"><div class="cap">Mejorar</div><p class="small">{{ mmp.mejorar }}</p></div>
+      <div class="card"><div class="cap">Practicar</div><p class="small">{{ mmp.practicar }}</p></div>
     </div>
     {% endif %}
 

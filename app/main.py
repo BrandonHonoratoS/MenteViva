@@ -55,7 +55,9 @@ async def seguridad(request: Request, call_next):
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["X-Frame-Options"] = "DENY"
     resp.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    resp.headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=()"
+    if request.url.path.startswith("/static/"):
+        resp.headers["Cache-Control"] = "no-cache"   # revalida con ETag; los ?v=VERSION cambian en cada versión
+    resp.headers["Permissions-Policy"] = "camera=(self), microphone=(self), geolocation=()"
     resp.headers["Content-Security-Policy"] = ("default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com 'unsafe-inline'; "
                                                "style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; "
                                                "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")

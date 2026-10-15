@@ -16,6 +16,7 @@ CATEGORIAS = [
     {"id": "CAT-06", "nombre": "Manejo de Conflictos", "icono": "⚡", "color": "#EF4444", "escenarios": 5},
     {"id": "CAT-07", "nombre": "Comunicación Asertiva", "icono": "💬", "color": "#EC4899", "escenarios": 5},
     {"id": "CAT-08", "nombre": "Gestión de Proyectos y Coordinación", "icono": "🚀", "color": "#6366F1", "escenarios": 5},
+    {"id": "CAT-09", "nombre": "Imagen Profesional y Etiqueta", "icono": "🪞", "color": "#D946EF", "escenarios": 4},
 ]
 
 # ── Habilidades entrenables hoy ──────────────────────────────────────────────
@@ -70,9 +71,80 @@ HABILIDADES: dict[str, dict] = {
         "activa": True, "personalizada": True, "empresa": "Ingeniería Cóndor",
         "duracion": {"*": 20}, "turnos": {"*": 22},
     },
+    "presentaciones": {
+        "id": "presentaciones", "categoria": "CAT-05", "nombre": "Presentaciones de alto impacto", "corto": "Presentaciones",
+        "agente": "valeria", "avatar": "Valeria Campos", "rol_avatar": "Audiencia exigente",
+        "descripcion": "Presenta un tema de tu trabajo ante una audiencia que pregunta, objeta y se distrae: graba tu voz y recibe la rúbrica de 9 criterios (apertura, síntesis, voz, muletillas, interacción, cierre, tiempo).",
+        "niveles": NIVELES_3, "escala": "0-100", "activa": True, "personalizada": False, "audio": True, "diseno": True,
+        "duracion": {"Principiante": 12, "Intermedio": 18, "Avanzado": 25},
+        "turnos": {"Principiante": 10, "Intermedio": 14, "Avanzado": 18},
+        "kpis": [
+            {"id": "KPI-1", "nombre": "Apertura e introducción", "que": "En 20–30 s engancha (pregunta, dato, situación), explica por qué importa y presenta propósito/agenda; sin saludos ni antecedentes largos."},
+            {"id": "KPI-2", "nombre": "Claridad y síntesis", "que": "Una idea central explícita y máximo tres puntos de apoyo; dice lo necesario sin rodeos ni relleno."},
+            {"id": "KPI-3", "nombre": "Estructura y orden lógico", "que": "Apertura → desarrollo → cierre con transiciones claras; no se pierde el hilo."},
+            {"id": "KPI-4", "nombre": "Manejo de la voz", "que": "Volumen audible, ritmo variable, pausas intencionales y énfasis en ideas clave (se evalúa con la grabación).", "audio": True},
+            {"id": "KPI-5", "nombre": "Fluidez, seguridad y muletillas", "que": "Entrega segura y natural; muletillas por minuto (≤1 alto impacto, 2–3 competente, 4–6 en desarrollo, >6 inicial); se recupera al perder el hilo (grabación).", "audio": True},
+            {"id": "KPI-6", "nombre": "Conexión e interacción", "que": "Se dirige a la audiencia, plantea preguntas, comprueba comprensión con evidencia, escucha la pregunta completa y responde con R-C-E-C."},
+            {"id": "KPI-7", "nombre": "Vocabulario y precisión", "que": "Lenguaje profesional, concreto y variado; traduce lo técnico y define términos la primera vez; sin expresiones vagas."},
+            {"id": "KPI-8", "nombre": "Cierre", "que": "En 30–45 s recapitula máximo tres ideas, refuerza el valor y deja un siguiente paso, decisión o reflexión; última frase con intención."},
+            {"id": "KPI-9", "nombre": "Manejo del tiempo", "que": "Respeta la duración pedida (±15 s = alto impacto; >60 s de desvío = inicial) con tiempos equilibrados (grabación).", "audio": True},
+        ],
+        "pesos": {n: {"KPI-1": 12, "KPI-2": 15, "KPI-3": 12, "KPI-4": 12, "KPI-5": 10, "KPI-6": 10, "KPI-7": 9, "KPI-8": 12, "KPI-9": 8} for n in NIVELES_3},
+    },
+    "imagen": {
+        "id": "imagen", "categoria": "CAT-09", "nombre": "Imagen profesional y código de vestimenta", "corto": "Imagen",
+        "agente": "renata", "avatar": "Renata Solís", "rol_avatar": "Consultora de imagen y etiqueta",
+        "descripcion": "Renata te plantea situaciones reales (demo con cliente, junta de dirección, entrevista, viernes casual, comida de negocios): describe o fotografía tu outfit y resuelve dilemas de etiqueta; te evalúa con los 5 códigos y los tips de medidas, calzado, perfume y modales.",
+        "niveles": NIVELES_3, "escala": "0-100", "activa": True, "personalizada": False, "foto": True, "diseno": True,
+        "duracion": {"Principiante": 10, "Intermedio": 15, "Avanzado": 20},
+        "turnos": {"Principiante": 10, "Intermedio": 14, "Avanzado": 16},
+        "kpis": [
+            {"id": "KPI-1", "nombre": "Adecuación al código y al contexto", "que": "Elige el código correcto (formal, business casual, smart casual, casual, viernes) según interlocutor, lugar y mensaje; un escalón por encima del cliente."},
+            {"id": "KPI-2", "nombre": "Ajuste, medidas y proporciones", "que": "Talla correcta; hombro del saco, puño visible, caída del pantalón sin arrugas sobre el zapato, largo de falda a la rodilla o máx. 5 cm arriba, escote discreto."},
+            {"id": "KPI-3", "nombre": "Pulcritud y cuidado", "que": "Prendas limpias y planchadas, calzado lustrado, cabello, uñas, barba o maquillaje sobrios; sin etiquetas, pelusas ni hilos."},
+            {"id": "KPI-4", "nombre": "Color, combinación y coherencia", "que": "2–3 colores, neutros de base y un acento; cinturón y zapatos del mismo tono; calcetín del tono del pantalón; nada estridente en formal."},
+            {"id": "KPI-5", "nombre": "Accesorios, perfume y detalles", "que": "Accesorios discretos que elevan; perfume recién bañado en puntos de pulso, 1–2 aplicaciones, nunca sobre la ropa ni reaplicado en la oficina; reloj, bolso o portafolio en buen estado."},
+            {"id": "KPI-6", "nombre": "Etiqueta y modales", "que": "Puntualidad, saludo firme con contacto visual, presentaciones en orden jerárquico, 'usted' por defecto, celular en silencio, conducta en la mesa y en videollamada."},
+        ],
+        "pesos": {n: {"KPI-1": 25, "KPI-2": 20, "KPI-3": 15, "KPI-4": 15, "KPI-5": 10, "KPI-6": 15} for n in NIVELES_3},
+    },
+    "comunicacion": {
+        "id": "comunicacion", "categoria": "CAT-07", "nombre": "Comunicación verbal efectiva", "corto": "Comunicación",
+        "agente": "mateo", "avatar": "Mateo Ibarra", "rol_avatar": "Interlocutor cotidiano",
+        "descripcion": "Comunica ideas con claridad y firmeza en el trabajo, la familia y la vida diaria: Mateo interpreta a tu pareja, un hijo, un compañero, tu jefe, un vecino o un cliente en conversaciones que suelen salir mal, y te evalúa claridad, escucha, asertividad y acuerdo.",
+        "niveles": NIVELES_3, "escala": "0-100", "activa": True, "personalizada": False, "audio": True, "diseno": True,
+        "duracion": {"Principiante": 12, "Intermedio": 15, "Avanzado": 20},
+        "turnos": {"Principiante": 12, "Intermedio": 16, "Avanzado": 20},
+        "kpis": [
+            {"id": "KPI-1", "nombre": "Claridad del mensaje", "que": "Una idea central, concreta y breve; se entiende qué quiere que el otro entienda, sienta o haga; pide en vez de reclamar."},
+            {"id": "KPI-2", "nombre": "Escucha y empatía", "que": "Deja terminar, parafrasea, nombra la emoción del otro, pregunta antes de responder; valida sin necesariamente dar la razón."},
+            {"id": "KPI-3", "nombre": "Asertividad", "que": "Expresa lo que piensa, siente y necesita con respeto, sin agredir ni ceder: mensajes 'yo', DESC, disco rayado, banco de niebla, decir no con alternativa."},
+            {"id": "KPI-4", "nombre": "Estructura y síntesis", "que": "Primero la idea principal, luego el porqué y un ejemplo; repite la petición al final; sin rodeos ni discursos largos."},
+            {"id": "KPI-5", "nombre": "Regulación emocional", "que": "Tono y volumen estables, pausas en vez de interrumpir, no se engancha en provocaciones ni decide en el pico de la emoción."},
+            {"id": "KPI-6", "nombre": "Acuerdo y cierre", "que": "Verifica comprensión, resume lo acordado, reparte responsabilidades y fija fecha o señal de seguimiento."},
+        ],
+        "pesos": {n: {"KPI-1": 20, "KPI-2": 20, "KPI-3": 20, "KPI-4": 15, "KPI-5": 10, "KPI-6": 15} for n in NIVELES_3},
+    },
+    "liderazgo": {
+        "id": "liderazgo", "categoria": "CAT-04", "nombre": "Liderazgo", "corto": "Liderazgo",
+        "agente": "patricia", "avatar": "Patricia Navarro", "rol_avatar": "Integrante del equipo",
+        "descripcion": "Conoce tu estilo (test del grid gerencial) y entrena con Patricia, que interpreta a integrantes de tu equipo en situaciones reales: delegar, dar retroalimentación difícil, desmotivación, conflicto, resistencia al cambio; te evalúa dirección, adaptación situacional, escucha, reconocimiento, decisión y gestión del cambio.",
+        "niveles": NIVELES_3, "escala": "0-100", "activa": True, "personalizada": False, "diseno": True, "test": "liderazgo", "para_directores": True,
+        "duracion": {"Principiante": 15, "Intermedio": 20, "Avanzado": 25},
+        "turnos": {"Principiante": 14, "Intermedio": 18, "Avanzado": 22},
+        "kpis": [
+            {"id": "KPI-1", "nombre": "Claridad de dirección", "que": "Objetivo, qué/quién/cuándo, criterio de éxito y el porqué; instrucciones claras sin microgestionar."},
+            {"id": "KPI-2", "nombre": "Adaptación situacional", "que": "Ajusta el estilo (dirigir, persuadir, participar, delegar) a la madurez de la persona y la tarea; equilibra tarea y relación (grid)."},
+            {"id": "KPI-3", "nombre": "Escucha y empatía", "que": "Pregunta y escucha antes de decidir; reconoce el impacto y la emoción del colaborador sin perder el foco."},
+            {"id": "KPI-4", "nombre": "Retroalimentación y reconocimiento", "que": "Feedback de conducta (qué pasó, efecto, qué hacer distinto) sin etiquetas; reconoce esfuerzos y resultados concretos; corrige en privado."},
+            {"id": "KPI-5", "nombre": "Decisión y accountability", "que": "Decide con evidencia, asume responsabilidad, no culpa; sostiene la decisión con firmeza y respeto."},
+            {"id": "KPI-6", "nombre": "Gestión del cambio e influencia", "que": "Usa poder experto, referente y premiador (no coercitivo); gestiona la resistencia con información, participación y triunfos tempranos (Lewin, Kotter)."},
+        ],
+        "pesos": {n: {"KPI-1": 20, "KPI-2": 20, "KPI-3": 15, "KPI-4": 15, "KPI-5": 15, "KPI-6": 15} for n in NIVELES_3},
+    },
 }
 
-PROXIMAMENTE = [c for c in CATEGORIAS if c["id"] not in ("CAT-01", "CAT-03")]
+PROXIMAMENTE = [c for c in CATEGORIAS if c["id"] not in ("CAT-01", "CAT-03", "CAT-04", "CAT-05", "CAT-07", "CAT-09")]
 
 # ── Ruta Delivery Manager (Ingeniería Cóndor) ────────────────────────────────
 RUTA_DM: list[dict] = [
@@ -235,7 +307,62 @@ def habilidades_que_usa(onboarding: dict) -> set[str]:
         usa.add("entrevistas")
     if ctx in ("Trabajo en una empresa", "Otra", ""):
         usa.add("ruta_dm")   # la ruta de desarrollo aplica a colaboradores de una empresa que la tenga habilitada (no a negocio propio, estudios u hogar)
+    usa.add("comunicacion")   # comunicarse mejor le sirve a todo el mundo (trabajo, familia, comunidad)
+    if ctx != "Me dedico al hogar y la familia" or meta == "Comunicarme mejor con mi familia y comunidad":
+        if f & (FUNCIONES_LIDERA | {"Ejecuto proyectos / consultoría", "Genero negocio nuevo", "Estudio"}) or ctx in ("Trabajo en una empresa", "Estudio", "Estoy buscando empleo", "Otra", ""):
+            usa.add("presentaciones")
+    if f & (FUNCIONES_VENTA | FUNCIONES_ENTREVISTA) or ctx in ("Trabajo en una empresa", "Estoy buscando empleo", "Tengo mi negocio u oficio", "Otra", ""):
+        usa.add("imagen")
+    if lidera(onboarding):
+        usa.add("liderazgo")
     return usa
+
+
+FUNCIONES_LIDERA = {"Lidero personas o proyectos"}
+
+
+def habilidades_nucleo(onboarding: dict) -> set[str]:
+    """Para público general: las habilidades que llevan plan automático aunque Elena no las liste (el corazón de su situación de vida).
+    Las demás relevantes (imagen, presentaciones, comunicación fuera del hogar…) aparecen en su catálogo y sólo llevan plan si Elena marca brecha alta/media."""
+    ob = onboarding or {}
+    f = set(ob.get("funciones") or [])
+    ctx = ob.get("contexto", "")
+    meta = ob.get("meta", "")
+    nucleo: set[str] = set()
+    if f & FUNCIONES_VENTA or ctx == "Tengo mi negocio u oficio" or meta == "Vender más en mi negocio":
+        nucleo.add("ventas")
+    if f & FUNCIONES_ENTREVISTA or ctx in ("Estoy buscando empleo", "Estudio") or meta in ("Conseguir un nuevo puesto", "Prepararme para mi primer empleo"):
+        nucleo.add("entrevistas")
+    if ctx == "Me dedico al hogar y la familia" or meta == "Comunicarme mejor con mi familia y comunidad":
+        nucleo.add("comunicacion")
+    if lidera(ob):
+        nucleo.add("liderazgo")
+    return nucleo or {"comunicacion"}
+
+
+def lidera(onboarding: dict) -> bool:
+    """¿Tiene gente a cargo (o aspira a tenerla) según lo declarado?"""
+    ob = onboarding or {}
+    f = set(ob.get("funciones") or [])
+    return bool(f & FUNCIONES_LIDERA) or ob.get("dm_lidera", "") in ("Superviso a una persona", "Lidero un equipo de hasta 5", "Lidero un equipo de más de 5") \
+        or ob.get("meta") in ("Capacitar a mi equipo",) or ob.get("dm_trabajo") in ("Liderar personas y proyectos", "Generar negocio nuevo", "Crear empresas o nuevos modelos")
+
+
+def es_kpi(habilidad_id: str) -> bool:
+    """Habilidades evaluadas por KPIs ponderados (todas salvo la Ruta DM, que usa competencias /10)."""
+    return bool((HABILIDADES.get(habilidad_id) or {}).get("kpis"))
+
+
+def habilidades_kpi() -> list[str]:
+    return [h for h in HABILIDADES if es_kpi(h)]
+
+
+def kpis_audio(habilidad_id: str) -> set[str]:
+    return {k["id"] for k in (HABILIDADES.get(habilidad_id) or {}).get("kpis", []) if k.get("audio")}
+
+
+def nivel_generico_estimado(onboarding: dict) -> str:
+    return nivel_ventas_estimado(onboarding)
 
 
 def es_contexto_empresa(onboarding: dict) -> bool:

@@ -2,7 +2,7 @@
 {% block subtitulo %}{% if s.tipo == 'diagnostico' %}Entrevista por competencias · Elena Ríos{% elif s.tipo == 'laboratorio' %}Laboratorio Interactivo de Habilidades para Delivery Managers · Juan Artiaga, evaluador{% else %}Nivel {{ s.nivel }}{% if s.competencia %} · {{ s.competencia }}{% endif %} · con {{ avatar.nombre }}{% endif %}{% endblock %}
 {% block content %}
 {% set esc = s.escenario or {} %}
-<div class="chat" id="sesion" data-id="{{ s.id }}" data-turnos="{{ s.turnos }}" data-max="{{ turnos_max }}" data-estado="{{ s.estado }}" data-avatar="{{ avatar.nombre }}" data-inicio="{{ s.inicio }}" data-duracion="{{ duracion }}" data-salida="{{ '/diagnostico' if s.tipo == 'diagnostico' else '/hoy' }}">
+<div class="chat" id="sesion" data-id="{{ s.id }}" data-turnos="{{ s.turnos }}" data-max="{{ turnos_max }}" data-estado="{{ s.estado }}" data-avatar="{{ avatar.nombre }}" data-inicio="{{ s.inicio }}" data-duracion="{{ duracion }}" data-salida="{{ salida }}" data-audio="{{ 1 if audio_ok else 0 }}" data-foto="{{ 1 if foto_ok else 0 }}" data-reporte-url="/sesion/{{ s.id }}/reporte">
   <aside class="side">
     <div class="card hero">
       <div class="orb-wrap"><div class="orb" id="orb" style="--c1:{{ avatar.color }};--c2:#06B6D4"></div><b>{{ avatar.nombre }}</b><span class="muted small">{{ esc.personaje or avatar.rol }}</span></div>
@@ -32,7 +32,10 @@
     <div class="card">
       <div class="cap">{{ 'Objetivo de la entrevista' if s.tipo == 'diagnostico' else 'Objetivo de la sesión' }}</div>
       <p>{{ s.objetivo or 'Conocer tus competencias con ejemplos reales.' }}</p>
-      {% if s.tipo == 'laboratorio' %}<div class="cap mt">Recuerda</div><p class="small muted">Responde como actuarías: qué harías, qué dirías o ambas. Juan no da pistas ni evalúa hasta el final. Las decisiones que tomes cambian la escena.</p>{% endif %}
+      {% if s.tipo == 'laboratorio' %}<div class="cap mt">Recuerda</div><p class="small muted">Responde como actuarías: qué harías, qué dirías o ambas. Juan no da pistas ni evalúa hasta el final. Las decisiones que tomen cambian la escena.</p>{% endif %}
+      {% if esc.tarea %}<div class="cap mt">Tu tarea</div><p class="small" id="esc-tarea">{{ esc.tarea }}</p>{% if esc.duracion_objetivo_s %}<span class="chip amber">grabación objetivo ~{{ (esc.duracion_objetivo_s // 60) }}:{{ '%02d' % (esc.duracion_objetivo_s % 60) }}</span>{% endif %}{% endif %}
+      {% if audio_ok %}<div class="cap mt">Grabar tu voz</div><p class="small muted">Pulsa 🎙️, habla y pulsa «Detener y enviar». Se transcribe y se miden ritmo, muletillas y tiempo; el audio no se guarda. También puedes responder por texto.</p>{% endif %}
+      {% if foto_ok %}<div class="cap mt">Enviar foto</div><p class="small muted">Pulsa 📷 y elige una foto (tuya o de referencia). Sólo se describe la ropa; la imagen se descarta y nunca se evalúa tu físico.</p>{% endif %}
       <div id="esc-box" style="display:{{ 'block' if esc.titulo and s.tipo != 'laboratorio' else 'none' }}"><div class="cap mt">Escenario</div><b id="esc-titulo">{{ esc.titulo }}</b>
         <div class="cap mt">Encuadre</div><p class="small" id="esc-encuadre">{{ esc.encuadre }}</p>
         <div class="cap mt">Situación</div><p class="small" id="esc-situacion">{{ esc.situacion }}</p>
@@ -46,15 +49,20 @@
   <section class="card panel">
     <div class="msgs" id="msgs">
       {% for msg in mensajes %}{% if msg.rol != 'sistema' or True %}
-      <div class="msg {{ msg.rol }}">{% if msg.rol == 'avatar' %}<span class="who">{{ avatar.nombre }}</span>{% elif msg.rol == 'usuario' %}<span class="who">Tú</span>{% endif %}{{ msg.texto }}</div>
+      <div class="msg {{ msg.rol }}">{% if msg.rol == 'avatar' %}<span class="who">{{ avatar.nombre }}</span>{% elif msg.rol == 'usuario' %}<span class="who">Tú</span>{% endif %}{% set a = (msg.meta or {}).get('audio') %}{% set f = (msg.meta or {}).get('foto') %}{% if a %}<span class="adj">🎙️ {{ (a.duracion_s // 60) }}:{{ '%02d' % (a.duracion_s % 60) }} · {{ a.ppm }} ppm · {{ a.muletillas }} muletillas</span>{% endif %}{% if f %}<span class="adj">📷 foto · {{ f.codigo_detectado }}</span>{% endif %}{{ msg.texto }}</div>
       {% endif %}{% endfor %}
     </div>
     {% if propia %}
     <div id="analizando" class="orb-wrap" style="display:{{ 'flex' if s.estado in ('analizando','error') else 'none' }};padding:30px 0">
       {% if s.estado == 'error' %}<div class="alert err">{{ s.error }}</div>{% else %}<div class="orb thinking" style="--c1:{{ avatar.color }};--c2:#A855F7"></div><b>Analizando tu sesión…</b><span class="muted small">{{ avatar.nombre }} está revisando la conversación completa con evidencia. Tarda menos de un minuto.</span>{% endif %}
     </div>
+    {% if audio_ok or foto_ok %}
+    <div id="adjunto-estado" class="row" style="display:none;gap:10px;align-items:center;padding:8px 0"><span class="rec-dot"></span><b id="rec-tiempo">0:00</b><span class="muted small" id="rec-msg">Grabando… habla con naturalidad</span><button class="btn sm" id="rec-stop" type="button">Detener y enviar</button><button class="btn ghost sm" id="rec-cancel" type="button">Cancelar</button></div>
+    {% endif %}
     <div class="composer" id="composer" style="display:{{ 'flex' if s.estado == 'en_curso' else 'none' }}">
-      <textarea id="texto" placeholder="Escribe tu respuesta… (Enter envía, Shift+Enter salto de línea)"></textarea>
+      {% if audio_ok %}<button class="btn" id="grabar" type="button" title="Grabar mi voz (máximo 7 min)">🎙️</button>{% endif %}
+      {% if foto_ok %}<label class="btn" id="foto-btn" title="Enviar una foto de mi outfit (propia o de referencia)">📷<input type="file" id="foto" accept="image/*" style="display:none"></label>{% endif %}
+      <textarea id="texto" placeholder="{{ 'Escribe o graba tu respuesta… (Enter envía)' if audio_ok else 'Escribe tu respuesta… (Enter envía, Shift+Enter salto de línea)' }}"></textarea>
       <button class="btn primary" id="enviar" type="button">Enviar</button>
     </div>
     {% if s.agente == 'celeste' and s.estado == 'en_curso' %}<div class="row mt"><span class="muted tiny">Atajos:</span><button class="btn sm" data-rapido="(silencio)" type="button">(silencio)</button><button class="btn sm" data-rapido="Fin" type="button">Fin</button></div>{% endif %}

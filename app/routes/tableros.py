@@ -40,7 +40,7 @@ def colaborador(request: Request, uid: int, u: dict = Depends(requiere_usuario))
     return render(request, "colaborador.html", u, x=x, f=f, perfil=perfil, diag=perfil.get("diagnostico") or {}, roadmaps=db.roadmaps(uid, ("activo", "propuesto", "completado")),
                   sesiones=[s for s in db.sesiones(usuario_id=uid, limite=30) if s["tipo"] in ("practica", "laboratorio")], analisis=db.analisis(x["empresa_id"], usuario_id=uid, limite=10),
                   evaluaciones=db.evaluaciones(usuario_id=uid), propuestas=db.propuestas(x["empresa_id"], estado=None, usuario_id=uid, limite=10),
-                  kpis={h: metrics.kpis_promedio(uid, h) for h in ("ventas", "entrevistas", "ruta_dm")}, periodo=db.periodo(),
+                  kpis={h: metrics.kpis_promedio(uid, h) for h in C.HABILIDADES}, periodo=db.periodo(),
                   puede_evaluar=u["rol"] == "director" and u.get("area_id") == x.get("area_id"), competencias=C.COMPETENCIAS_DIAGNOSTICO)
 
 

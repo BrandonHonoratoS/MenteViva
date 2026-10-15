@@ -31,7 +31,7 @@ def _f(key: str, default: float) -> float:
 class Settings:
     APP_NAME = "Mente Viva"
     TAGLINE = "Crece desde adentro, impacta hacia afuera"
-    VERSION = "1.3.0"
+    VERSION = "1.4.0"
 
     def __init__(self) -> None:
         self.APP_ENV = os.getenv("APP_ENV", "development")
@@ -117,6 +117,8 @@ class Settings:
         self.TURNOS_RESUMEN = _i("TURNOS_RESUMEN", 10)             # cada N turnos se comprime el historial antiguo
         self.TURNOS_VENTANA = _i("TURNOS_VENTANA", 14)             # mensajes recientes que viajan completos al modelo
         self.ANALISIS_SINCRONO = _b("ANALISIS_SINCRONO", False)    # pruebas: analizar en el mismo hilo
+        self.AUDIO_ENABLED = _b("AUDIO_ENABLED", True)             # grabaciones de voz (presentaciones, comunicación): se transcriben y no se guardan
+        self.FOTO_ENABLED = _b("FOTO_ENABLED", True)               # fotos del outfit (imagen profesional): se describen y no se guardan
 
         # ── Programador de tareas ───────────────────────────────────────────
         self.SCHEDULE_ENABLED = _b("SCHEDULE_ENABLED", self.APP_ENV == "production")

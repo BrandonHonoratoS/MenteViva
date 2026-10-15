@@ -75,7 +75,8 @@ def kpis_promedio(usuario_id: int, habilidad: str, ultimas: int = 3) -> list[dic
     nombres: dict[str, str] = {}
     for s in ss:
         for k in (s.get("resultado") or {}).get("kpis", []):
-            acc[k["id"]].append(float(k.get("score", 0)))
+            if k.get("evaluable", True):   # los KPIs de voz sin grabación no cuentan
+                acc[k["id"]].append(float(k.get("score", 0)))
         for sd in (s.get("resultado") or {}).get("subdimensiones", []):
             acc[sd["nombre"]].append(float(sd.get("score", 0)) * 10)
     hab = C.HABILIDADES.get(habilidad) or {}
@@ -220,7 +221,7 @@ def kpis_organizacion(empresa_id: int, area_id: int | None = None, dias: int = 3
 
     # distribución Ruta DM y niveles
     dist_dm: dict[str, int] = {n: 0 for n in C.NIVELES_DM}
-    dist_niv: dict[str, dict[str, int]] = {h: defaultdict(int) for h in ("ventas", "entrevistas")}
+    dist_niv: dict[str, dict[str, int]] = {h: defaultdict(int) for h in C.habilidades_kpi()}
     for u in colabs:
         for h, n in db.niveles(u["id"]).items():
             if h == "ruta_dm" and n["nivel"] in dist_dm:
@@ -248,7 +249,7 @@ def kpis_organizacion(empresa_id: int, area_id: int | None = None, dias: int = 3
     # KPIs por habilidad (promedio organizacional de las últimas 3 sesiones por persona)
     kpis_hab: dict[str, dict[str, list[float]]] = {h: defaultdict(list) for h in C.HABILIDADES}
     for u in colabs:
-        for h in ("ventas", "entrevistas", "ruta_dm"):
+        for h in C.HABILIDADES:
             for k in kpis_promedio(u["id"], h):
                 if k["score"] is not None:
                     kpis_hab[h][k["nombre"]].append(k["score"])

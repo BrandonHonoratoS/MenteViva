@@ -131,6 +131,70 @@
     $$('[data-rapido]').forEach(b => b.onclick = () => enviar(b.dataset.rapido));
     $('#terminar')?.addEventListener('click', async () => { if (!confirm('¿Terminar la práctica y pasar al análisis?')) return; try { await api('/api/sesiones/' + id + '/terminar'); finalizar(); } catch (e) { toast(e.message); } });
     $('#descartar')?.addEventListener('click', async () => { if (!confirm('¿Descartar esta sesión? No se analizará.')) return; try { await api('/api/sesiones/' + id + '/descartar'); location.href = ses.dataset.salida || '/hoy'; } catch (e) { toast(e.message); } });
+    /* ── grabación de voz (MediaRecorder → /audio) y foto (/foto) ── */
+    async function subirAdjunto(url, form, etiqueta) {
+      if (fin || pendiente) { toast('Espera la respuesta anterior.'); return; }
+      btn.disabled = true; pendiente = true; add('usuario', etiqueta); typing(true);
+      try {
+        form.append('csrf', CSRF);
+        const r = await fetch(url, { method: 'POST', headers: { 'X-CSRF': CSRF }, body: form });
+        let js = {}; try { js = await r.json(); } catch (e) { js = {}; }
+        if (!r.ok) throw new Error(js.error || ('Error ' + r.status));
+        typing(false);
+        const ult = $$('#msgs .msg.usuario').pop();
+        if (ult && js.transcripcion) { const a = js.audio || {}; ult.innerHTML = '<span class="who">Tú</span><span class="adj">🎙️ ' + Math.floor(a.duracion_s / 60) + ':' + String(a.duracion_s % 60).padStart(2, '0') + ' · ' + a.ppm + ' ppm · ' + a.muletillas + ' muletillas</span>' + esc(js.transcripcion); }
+        if (ult && js.foto) { ult.innerHTML = '<span class="who">Tú</span><span class="adj">📷 foto · ' + esc(js.foto.codigo_detectado) + '</span>' + esc(js.foto.es_outfit ? 'Te envío una foto de mi outfit.' : 'Te envié una imagen.'); }
+        aplicar(js);
+      } catch (e) {
+        typing(false); pendiente = false;
+        const ult = $$('#msgs .msg.usuario').pop(); if (ult) ult.remove();
+        if (/agotó|presupuesto/i.test(e.message)) { add('sistema', e.message); fin = true; } else add('sistema', e.message);
+      }
+      btn.disabled = false;
+    }
+    const grabar = $('#grabar');
+    if (grabar && ses.dataset.audio === '1') {
+      let rec = null, chunks = [], t0 = 0, tick = null, cancelado = false; const MAX = 420;
+      const estado = $('#adjunto-estado');
+      function parar(cancel) { cancelado = !!cancel; if (rec && rec.state !== 'inactive') rec.stop(); }
+      grabar.onclick = async () => {
+        if (rec && rec.state === 'recording') { parar(false); return; }
+        if (!navigator.mediaDevices || !window.MediaRecorder) { toast('Tu navegador no permite grabar; escribe tu respuesta.'); return; }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const tipo = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+          rec = new MediaRecorder(stream, tipo ? { mimeType: tipo } : undefined); chunks = []; cancelado = false;
+          rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+          rec.onstop = () => {
+            stream.getTracks().forEach(t => t.stop()); clearInterval(tick); estado.style.display = 'none'; grabar.classList.remove('on'); $('#composer').style.display = 'flex';
+            const dur = Math.round((Date.now() - t0) / 1000);
+            if (cancelado || !chunks.length || dur < 2) { if (!cancelado) toast('La grabación quedó demasiado corta.'); return; }
+            const blob = new Blob(chunks, { type: rec.mimeType || tipo || 'audio/webm' });
+            const form = new FormData(); form.append('archivo', blob, 'grabacion.' + ((blob.type.includes('mp4')) ? 'mp4' : (blob.type.includes('ogg') ? 'ogg' : 'webm'))); form.append('duracion', String(dur));
+            subirAdjunto('/api/sesiones/' + id + '/audio', form, '🎙️ Grabación de ' + Math.floor(dur / 60) + ':' + String(dur % 60).padStart(2, '0') + ' (transcribiendo…)');
+          };
+          rec.start(1000); t0 = Date.now(); grabar.classList.add('on'); estado.style.display = 'flex'; $('#composer').style.display = 'none';
+          tick = setInterval(() => { const s = Math.floor((Date.now() - t0) / 1000); $('#rec-tiempo').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); if (s >= MAX) parar(false); }, 500);
+        } catch (e) { toast('No se pudo acceder al micrófono: revisa el permiso del navegador.'); }
+      };
+      $('#rec-stop').onclick = () => parar(false);
+      $('#rec-cancel').onclick = () => parar(true);
+    }
+    const foto = $('#foto');
+    if (foto && ses.dataset.foto === '1') {
+      foto.onchange = () => {
+        const f = foto.files && foto.files[0]; if (!f) return;
+        const img = new Image(); const url = URL.createObjectURL(f);
+        img.onload = () => {
+          // se reduce a máx. 1280 px (menos bytes, mismo análisis) y se envía como JPEG
+          const esc_ = Math.min(1, 1280 / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * esc_); c.height = Math.round(img.height * esc_);
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+          c.toBlob(blob => { const form = new FormData(); form.append('archivo', blob, 'outfit.jpg'); form.append('comentario', ta.value.trim()); ta.value = ''; subirAdjunto('/api/sesiones/' + id + '/foto', form, '📷 Foto enviada (analizando la vestimenta…)'); foto.value = ''; }, 'image/jpeg', 0.86);
+        };
+        img.onerror = () => { toast('No se pudo leer la imagen.'); foto.value = ''; };
+        img.src = url;
+      };
+    }
     if (ses.dataset.estado === 'analizando') finalizar();
     if (ses.dataset.estado === 'error') { finalizar(); }
     // Sin apertura del avatar (o último mensaje del usuario sin respuesta): pedirla ahora, con reintento automático.
@@ -213,6 +277,7 @@
     };
     s.onerror = () => { mapa.innerHTML = '<pre class="small" style="white-space:pre-wrap">' + esc(src) + '</pre>'; };
     document.head.appendChild(s);
+    setTimeout(() => { if ($('.mermaid-src', mapa)) s.onerror(); }, 15000);   // si la librería no carga en 15 s, se muestra la estructura en texto
   }
   const espera = $('#lec-espera');
   if (espera) {

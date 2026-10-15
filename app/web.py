@@ -20,7 +20,8 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent / "web" / "templ
 NAV = {
     "colaborador": [("/hoy", "Hoy", "home"), ("/roadmaps", "Mis planes", "map"), ("/socrates", "Sócrates", "book"), ("/catalogo", "Entrenar", "spark"), ("/mi-diagnostico", "Mi diagnóstico", "user"),
                     ("/historial", "Historial", "clock"), ("/autoevaluacion", "Autoevaluación", "check")],
-    "director": [("/equipo", "Mi equipo", "team"), ("/metas", "Metas", "target"), ("/analista", "Analista", "brain"), ("/analisis", "Análisis", "doc")],
+    "director": [("/equipo", "Mi equipo", "team"), ("/metas", "Metas", "target"), ("/analista", "Analista", "brain"), ("/analisis", "Análisis", "doc"),
+                 ("/entrenar/liderazgo", "Entrenar liderazgo", "spark"), ("/historial", "Mis prácticas", "clock")],
     "rrhh": [("/rrhh", "Organización", "chart"), ("/gestion", "Áreas y personas", "team"), ("/aprobaciones", "Aprobaciones", "check"), ("/metas", "Metas", "target"),
              ("/analista", "Analista", "brain"), ("/analisis", "Análisis", "doc"), ("/evaluaciones", "Evaluaciones", "star"), ("/estandares", "Estándares", "settings"), ("/encuestas", "Experiencia", "star")],
     "dg": [("/direccion", "Dirección", "chart"), ("/analista", "Analista", "brain"), ("/analisis", "Análisis", "doc")],

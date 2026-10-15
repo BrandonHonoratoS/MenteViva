@@ -13,7 +13,7 @@
     <div class="card"><h2>Niveles</h2><div class="grid g3">{% for h, n in f.niveles_detalle.items() %}<div><div class="muted tiny">{{ h|hab }}</div><span class="badge-level">{{ n.nivel }}</span><div class="muted tiny">inicial {{ n.score_inicial|num }} · actual {{ n.score_actual|num }} · {{ n.sesiones }} ses.</div>
       {% if h == 'ruta_dm' and n.competencias %}<div class="mt">{% for c, d in n.competencias.items() %}<span class="chip {{ 'mint' if d.score >= 9 else ('aqua' if d.score >= 7 else ('amber' if d.score >= 5 else 'rose')) }}" title="{{ d.dominio }}">{{ c }} {{ d.score }}</span> {% endfor %}</div>{% endif %}</div>{% endfor %}</div></div>
     <div class="card"><h2>Evolución</h2><div style="height:220px">{% if f.serie %}<canvas data-line='{{ {"labels": f.serie|map(attribute="fecha")|list, "values": f.serie|map(attribute="score")|list}|tojson_safe }}'></canvas>{% else %}<div class="empty">Sin sesiones de práctica.</div>{% endif %}</div></div>
-    {% if kpis.ventas or kpis.entrevistas or kpis.ruta_dm %}
+    {% if kpis.values()|select|list %}
     <div class="grid g3">{% for h, r in kpis.items() if r %}<div class="card"><h3>{{ h|hab_corto }} · últimos KPIs</h3><div style="height:200px"><canvas data-radar='{{ {"labels": r|map(attribute="nombre")|list, "values": r|map(attribute="score")|list}|tojson_safe }}'></canvas></div></div>{% endfor %}</div>
     {% endif %}
     <div class="card"><h2>Sesiones</h2>

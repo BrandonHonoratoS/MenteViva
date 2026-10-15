@@ -221,6 +221,15 @@ def encuestas(request: Request, u: dict = Depends(rrhh)):
     return render(request, "encuestas.html", u, lista=lista, r=ENC.resumen(lista, False), incluir_precio=False, elegibles=elegibles)
 
 
+@router.get("/encuestas/{eid}")
+def encuesta_detalle(request: Request, eid: int, u: dict = Depends(rrhh)):
+    from .. import encuesta as ENC
+    e = next((x for x in db.encuestas(u["empresa_id"]) if x["id"] == eid), None)
+    if not e:
+        raise HTTPException(404, "Encuesta no encontrada")
+    return render(request, "encuesta_detalle.html", u, e=e, secciones=ENC.SECCIONES, incluir_precio=False)
+
+
 # ── análisis y chat con el Analista ──────────────────────────────────────────
 @router.get("/analisis")
 def analisis(request: Request, u: dict = Depends(managers), tipo: str = ""):

@@ -182,6 +182,15 @@ def encuestas(request: Request, u: dict = Depends(sa)):
     return render(request, "encuestas.html", u, lista=lista, r=ENC.resumen(lista, True), incluir_precio=True, elegibles=elegibles)
 
 
+@router.get("/encuestas/{eid}")
+def encuesta_detalle(request: Request, eid: int, u: dict = Depends(sa)):
+    from .. import encuesta as ENC
+    e = next((x for x in db.encuestas() if x["id"] == eid), None)
+    if not e:
+        raise HTTPException(404, "Encuesta no encontrada")
+    return render(request, "encuesta_detalle.html", u, e=e, secciones=ENC.SECCIONES, incluir_precio=True)
+
+
 @router.get("/encuestas.xlsx")
 def encuestas_xlsx(u: dict = Depends(sa)):
     from ..reports import excel

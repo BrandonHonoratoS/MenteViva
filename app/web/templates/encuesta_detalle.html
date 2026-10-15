@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% block title %}Encuesta de {{ e.usuario_nombre }}{% endblock %}
+{% block subtitulo %}Respuestas completas · {{ e.creado_en|fecha }}{% if not incluir_precio %} · la sección de precio sólo la ve el equipo Mente Viva{% endif %}{% endblock %}
+{% block acciones %}<a class="btn sm" href="{{ '/admin/encuestas' if u.rol == 'superadmin' else '/encuestas' }}">← Todas las respuestas</a>{% endblock %}
+{% block content %}
+<div class="card mb"><div class="row between"><div><b>{{ e.usuario_nombre }}</b><div class="muted small">{{ e.puesto or '' }} · {{ e.area_nombre or '—' }}{% if u.rol == 'superadmin' %} · {{ e.empresa_nombre }}{% endif %}</div></div>
+  <div class="row" style="gap:16px"><span class="chip">Calificación {{ e.respuestas.calificacion }}/10</span><span class="chip aqua">NPS {{ e.respuestas.nps }}</span>{% if e.sesion_id %}<a class="small" href="/sesion/{{ e.sesion_id }}/reporte">Primera práctica →</a>{% endif %}</div></div></div>
+{% for s in secciones if incluir_precio or not s.precio %}
+<div class="card mb"><h2>{{ s.titulo }}</h2>
+  {% for p in s.preguntas %}{% set v = e.respuestas.get(p.id) %}
+  <div class="kpi-row" style="grid-template-columns:1fr 1fr"><span class="small muted">{{ p.texto }}</span><b class="small">{% if v is none or v == '' or v == [] %}—{% elif v is iterable and v is not string %}{{ v|join(', ') }}{% elif p.tipo == 'numero' %}{{ v|num(0) }} {{ p.sufijo }}{% else %}{{ v }}{% endif %}</b></div>
+  {% endfor %}
+</div>
+{% endfor %}
+{% endblock %}

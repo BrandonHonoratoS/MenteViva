@@ -13,13 +13,38 @@
     {% elif hab.id == 'entrevistas' %}
     <div class="cap mt-l">Cómo te evalúa Elena</div>
     {% for k in kpis %}<div class="row between small"><span>{{ k.id }} {{ k.nombre }}</span><b>{{ pesos.get(k.id, 0) }} %</b></div>{% endfor %}
-    {% else %}
+    {% elif hab.id == 'ruta_dm' %}
     <div class="cap mt-l">Tu ruta</div>
     <div class="dm-track">{% for n in RUTA_DM %}<span class="{{ 'on' if n.nivel == nivel else ('done' if RUTA_DM.index(n) < (RUTA_DM|map(attribute='nivel')|list).index(nivel) else '') }}">{{ n.nivel }}</span>{% endfor %}</div>
     <p class="small muted mt">Estás en <b>{{ nivel }}</b>. Entrenas las competencias de <b>{{ sig_dm }}</b> → “{{ valor_dm }}”. Juan elige el formato (roleplay, caso o reto) que mejor revele tu conducta real. Al final: 9 secciones de retroalimentación profunda.</p>
+    {% else %}
+    <div class="cap mt-l">Cómo te evalúa {{ avatar.nombre.split(' ')[0] }}</div>
+    {% for k in kpis %}<div class="row between small" style="gap:10px;align-items:flex-start"><span style="flex:1">{{ k.id }} {{ k.nombre }}{% if k.audio %} <span class="chip gris" style="font-size:.65rem">voz</span>{% endif %}</span><b style="white-space:nowrap">{{ pesos.get(k.id, 0) }} %</b></div>{% endfor %}
+    {% if audio_ok %}<p class="small muted mt">🎙️ En esta práctica puedes <b>grabar tu voz</b> desde el micrófono del navegador: la IA la transcribe y mide duración, palabras por minuto, muletillas, pausas, ritmo y energía. El audio no se guarda; sólo la transcripción y las métricas. Los criterios marcados «voz» sólo se evalúan si grabas.</p>{% endif %}
+    {% if foto_ok %}<p class="small muted mt">📷 Puedes <b>enviar una foto</b> de tu outfit (propia o de referencia de internet): se describe la vestimenta de forma objetiva y la imagen se descarta; nunca se evalúa tu físico.</p>{% endif %}
+    {% if hab.id == 'liderazgo' %}<p class="small muted mt">Patricia diseña cada escena a partir de tu contexto y de tu estilo del test; nunca da pistas durante la práctica.</p>{% endif %}
+    {% if historial %}<div class="cap mt">Tus últimas sesiones</div><div class="row" style="gap:6px">{% for h in historial %}<a class="chip {{ 'mint' if h.score_global >= 75 else ('amber' if h.score_global >= 50 else 'rose') }}" href="/sesion/{{ h.id }}/reporte">{{ h.inicio|fecha_corta }} · {{ h.score_global|round(0)|int }}</a>{% endfor %}</div>{% endif %}
     {% endif %}
   </div>
   <div class="card">
+    {% if test and not estilo %}
+    <div class="cap">Antes de tu primera sesión · Test: ¿qué tipo de liderazgo ejerces?</div>
+    <p class="small muted">Responde con la opción que más se ajuste a tu forma de liderar. Patricia usará tu estilo para diseñar escenas que te reten a flexibilizarlo.</p>
+    <form method="post" action="/entrenar/liderazgo/test" class="stack" id="test-lid">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      {% for q, ops in test %}{% set i = loop.index0 %}
+      <div class="field"><label>{{ loop.index }}. {{ q }}</label>
+        <div class="stack" style="gap:4px">{% for o in ops %}<label class="chip-opt" style="display:flex;align-items:flex-start;gap:8px"><input type="radio" name="q{{ i }}" value="{{ 'abcd'[loop.index0] }}" required><span class="small">{{ o }}</span></label>{% endfor %}</div></div>
+      {% endfor %}
+      <button class="btn primary block" type="submit">Ver mi estilo y continuar</button>
+    </form>
+    {% else %}
+    {% if estilo %}
+    <div class="card mb" style="background:var(--surface-2);border:1px solid var(--line)"><div class="row between"><div class="cap">Tu estilo según el test (grid gerencial)</div><span class="muted tiny">{{ estilo.fecha|fecha_corta if estilo.fecha else '' }}</span></div>
+      <p><b>{{ estilo.predominante }}</b> <span class="muted small">— {{ estilo.lectura }}</span></p>
+      <div class="row" style="gap:6px">{% for n, v in estilo.perfil.items() %}<span class="chip {{ 'aqua' if n == estilo.predominante else 'gris' }}">{{ n }} {{ v }}</span>{% endfor %}</div>
+      <details class="mt"><summary class="small muted">Repetir el test</summary><form method="post" action="/entrenar/liderazgo/test" class="stack mt"><input type="hidden" name="csrf" value="{{ csrf }}">{% for q, ops in test %}{% set i = loop.index0 %}<div class="field"><label class="small">{{ loop.index }}. {{ q }}</label><div class="stack" style="gap:4px">{% for o in ops %}<label class="chip-opt" style="display:flex;align-items:flex-start;gap:8px"><input type="radio" name="q{{ i }}" value="{{ 'abcd'[loop.index0] }}" required><span class="small">{{ o }}</span></label>{% endfor %}</div></div>{% endfor %}<button class="btn sm" type="submit">Guardar nuevo resultado</button></form></details></div>
+    {% endif %}
     <form method="post" action="/entrenar/{{ hab.id }}/iniciar">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       {% if item %}
@@ -30,7 +55,7 @@
       <div class="cap">Práctica voluntaria</div>
       <div class="field"><label>Nivel</label><select name="nivel">{% for n in hab.niveles %}<option value="{{ n }}" {{ 'selected' if n == nivel }}>{{ n }}</option>{% endfor %}</select></div>
       {% if competencias %}<div class="field"><label>Competencia del siguiente nivel ({{ sig_dm }})</label><select name="competencia">{% for c in competencias %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</select></div>{% endif %}
-      <div class="field"><label>Objetivo que quieres trabajar (opcional)</label><input name="objetivo" placeholder="Ej. manejar la objeción de precio sin ceder"></div>
+      <div class="field"><label>Objetivo que quieres trabajar (opcional)</label><input name="objetivo" placeholder="{{ {'ventas': 'Ej. manejar la objeción de precio sin ceder', 'entrevistas': 'Ej. contar una historia STAR con resultado medible', 'ruta_dm': 'Ej. sostener una decisión difícil con el cliente', 'presentaciones': 'Ej. abrir con gancho y cerrar con un siguiente paso en 3 minutos', 'imagen': 'Ej. prepararme para una comida formal con un cliente', 'comunicacion': 'Ej. ponerle un límite a mi hijo sin pelear', 'liderazgo': 'Ej. dar retroalimentación difícil sin que se cierre'}.get(hab.id, 'Ej. lo que quieres practicar hoy') }}"></div>
       {% endif %}
       {% if hab.id == 'ventas' %}<div class="field"><label>¿Qué vas a vender hoy? (opcional)</label><input name="producto" value="{{ perfil.onboarding.get('producto_concreto','') }}" placeholder="Ej. implementación de Odoo para una PYME de manufactura"></div>{% endif %}
       {% if leccion %}{% set lc = leccion.contenido %}
@@ -44,6 +69,7 @@
       <button class="btn primary lg block" type="submit">Entrar con {{ avatar.nombre.split(' ')[0] }}</button>
       {% if item %}<p class="center mt"><a class="small" href="/entrenar/{{ hab.id }}?item=0">Prefiero una práctica libre</a></p>{% endif %}
     </form>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

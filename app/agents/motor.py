@@ -21,7 +21,7 @@ from . import esquemas as E
 from . import laboratorio as L
 from . import prompts as P
 from . import validar as V
-from .avatares import AVATARES, Juan, _texto_perfil, agente_para, json_compacto, transcript_texto
+from .avatares import AVATARES, Juan, _texto_perfil, agente_para, es_generico, json_compacto, nota_adjunto, transcript_texto
 
 log = logging.getLogger("mv.motor")
 _LOCKS: dict[int, threading.Lock] = {}
@@ -70,6 +70,14 @@ def iniciar(usuario: dict, habilidad_id: str, item: dict | None = None, nivel: s
     elif habilidad_id == "ruta_dm" and not competencia:
         sig = C.nivel_dm_siguiente(nivel) or nivel
         competencia = (C.competencias_dm(sig) or ["Comunicación"])[0]
+    if hab.get("test") == "liderazgo":
+        est = ((niv or {}).get("competencias") or {}).get("estilo")
+        if isinstance(est, dict):
+            escenario["estilo_test"] = {k: est.get(k) for k in ("predominante", "lectura", "perfil")}
+    if hab.get("audio"):
+        escenario.setdefault("grabaciones", 0)
+    if hab.get("foto"):
+        escenario.setdefault("fotos", 0)
 
     sid = db.crear_sesion(usuario["id"], habilidad_id, agente.id, tipo=tipo, roadmap_item_id=(item or {}).get("id"), nivel=nivel,
                           competencia=competencia, formato="laboratorio" if tipo == "laboratorio" else "", objetivo=objetivo, escenario=escenario,
@@ -101,13 +109,13 @@ def continuar(sesion: dict, usuario: dict) -> dict | None:
         escenario = dict(sesion.get("escenario") or {})
         if sesion["tipo"] == "laboratorio":
             return _continuar_laboratorio(sesion, usuario, perfil, escenario)
-        if agente is Juan and not escenario.get("titulo"):
-            historial = _historial_competencia(usuario["id"], sesion.get("competencia") or "")
-            prompt, schema = Juan.prompt_diseno(sesion, usuario, perfil, historial)
-            r = llm.generar(origen="juan.diseno", system=prompt, contents=[{"role": "user", "text": "Diseña la sesión."}], schema=schema,
+        if (agente is Juan or es_generico(agente)) and not escenario.get("titulo"):
+            historial = _historial_competencia(usuario["id"], sesion.get("competencia") or "") if agente is Juan else _historial_scores(usuario["id"], sesion["habilidad"])
+            prompt, schema = agente.prompt_diseno(sesion, usuario, perfil, historial)
+            r = llm.generar(origen=f"{agente.id}.diseno", system=prompt, contents=[{"role": "user", "text": "Diseña la sesión."}], schema=schema,
                             thinking=settings.GEMINI_THINKING_ANALISIS, max_tokens=3000, usuario_id=usuario["id"], sesion_id=sesion["id"], temperatura=0.8)
-            V.registrar_si_incompleto("juan.diseno", r.json, usuario.get("email", ""))
-            dis = V.diseno_juan(r.json, sesion)
+            V.registrar_si_incompleto(f"{agente.id}.diseno", r.json, usuario.get("email", ""))
+            dis = V.diseno_juan(r.json, sesion) if agente is Juan else V.diseno_generico(r.json, sesion)
             escenario.update(dis)
             db.actualizar_sesion(sesion["id"], escenario_json=escenario, formato=dis["formato"])
             sesion = db.sesion(sesion["id"])
@@ -234,6 +242,11 @@ def _turno_laboratorio(sesion: dict, usuario: dict, perfil: dict, escenario: dic
     return {"texto": texto, **meta}
 
 
+def _historial_scores(usuario_id: int, habilidad: str) -> list[dict]:
+    out = [{"fecha": s["inicio"], "score": s.get("score_global")} for s in db.sesiones(usuario_id=usuario_id, habilidad=habilidad, estado="completada", limite=5) if s["tipo"] == "practica"]
+    return list(reversed(out))
+
+
 def _historial_competencia(usuario_id: int, competencia: str) -> list[dict]:
     out = []
     for s in db.sesiones(usuario_id=usuario_id, habilidad="ruta_dm", estado="completada", limite=30):
@@ -254,7 +267,8 @@ def _contenidos(sesion: dict, mensajes: list[dict], pista_apertura: str | None =
         contents.append({"role": "user", "text": f"[Memoria de lo conversado hasta ahora: {memoria}]"})
         contents.append({"role": "model", "text": "(continúo en personaje)"})
     for m in recientes:
-        contents.append({"role": "user" if m["rol"] == "usuario" else "model", "text": m["texto"]})
+        nota = nota_adjunto(m.get("meta")) if m["rol"] == "usuario" else ""
+        contents.append({"role": "user" if m["rol"] == "usuario" else "model", "text": (nota + "\n" if nota else "") + m["texto"]})
     if pista_apertura:
         contents.append({"role": "user", "text": pista_apertura})
     if not contents or contents[0]["role"] != "user":
@@ -286,8 +300,8 @@ def _generar_turno(sesion: dict, usuario: dict, perfil: dict, pista: str | None 
     return {"texto": texto, **meta}
 
 
-def turno(sesion: dict, usuario: dict, texto: str) -> dict:
-    """Procesa un mensaje del usuario y devuelve la respuesta del avatar."""
+def turno(sesion: dict, usuario: dict, texto: str, meta_usuario: dict | None = None) -> dict:
+    """Procesa un mensaje del usuario (texto, o transcripción de una grabación / descripción de una foto en `meta_usuario`) y devuelve la respuesta del avatar."""
     lk = _lock(sesion["id"])
     if not lk.acquire(blocking=False):
         raise SesionOcupada("El avatar todavía está respondiendo.")
@@ -295,11 +309,19 @@ def turno(sesion: dict, usuario: dict, texto: str) -> dict:
         sesion = db.sesion(sesion["id"])
         if sesion["estado"] != "en_curso":
             raise SesionOcupada("La sesión ya terminó.")
-        texto = (texto or "").strip()[:2000]
+        texto = (texto or "").strip()[:12000 if meta_usuario else 2000]
         if not texto:
             raise ValueError("Escribe algo para continuar.")
-        db.guardar_mensaje(sesion["id"], "usuario", texto)
-        db.registrar_actividad(usuario["id"], minutos=1, turnos=1)
+        db.guardar_mensaje(sesion["id"], "usuario", texto, meta_usuario or None)
+        if meta_usuario:
+            esc = dict(sesion.get("escenario") or {})
+            if meta_usuario.get("audio"):
+                esc["grabaciones"] = int(esc.get("grabaciones") or 0) + 1
+                esc["voz_resumen"] = _resumen_voz(esc.get("voz_resumen"), meta_usuario["audio"])
+            if meta_usuario.get("foto"):
+                esc["fotos"] = int(esc.get("fotos") or 0) + 1
+            db.actualizar_sesion(sesion["id"], escenario_json=esc)
+        db.registrar_actividad(usuario["id"], minutos=max(1, int((meta_usuario or {}).get("audio", {}).get("duracion_s", 0) // 60) + 1), turnos=1)
         sesion = db.sesion(sesion["id"])
         perfil = db.perfil(usuario["id"])
         if sesion["tipo"] == "laboratorio":
@@ -324,6 +346,23 @@ def turno(sesion: dict, usuario: dict, texto: str) -> dict:
         return resp
     finally:
         lk.release()
+
+
+def _resumen_voz(previo: dict | None, a: dict) -> dict:
+    """Agregado de todas las grabaciones de la sesión (para el reporte y las métricas): duración, ppm, muletillas/min, seguridad."""
+    p = dict(previo or {"grabaciones": 0, "duracion_s": 0, "palabras": 0, "muletillas": 0, "seguridad_suma": 0, "pausas_largas": 0})
+    p["grabaciones"] = int(p.get("grabaciones", 0)) + 1
+    p["duracion_s"] = int(p.get("duracion_s", 0)) + int(a.get("duracion_s") or 0)
+    p["palabras"] = int(p.get("palabras", 0)) + int(a.get("palabras") or 0)
+    p["muletillas"] = int(p.get("muletillas", 0)) + int(a.get("muletillas") or 0)
+    p["pausas_largas"] = int(p.get("pausas_largas", 0)) + int(a.get("pausas_largas") or 0)
+    p["seguridad_suma"] = int(p.get("seguridad_suma", 0)) + int(a.get("seguridad") or 0)
+    d = p["duracion_s"] or 1
+    p["ppm"] = round(p["palabras"] / d * 60)
+    p["muletillas_min"] = round(p["muletillas"] / d * 60, 1)
+    p["seguridad"] = round(p["seguridad_suma"] / p["grabaciones"], 1)
+    p["ultimo_ritmo"], p["ultima_variedad"], p["ultima_energia"] = a.get("ritmo"), a.get("variedad_vocal"), a.get("energia_cierre")
+    return p
 
 
 def _quiza_resumir(sesion: dict, usuario: dict) -> None:
@@ -402,7 +441,7 @@ def analizar(sesion_id: int) -> None:
                             thinking=settings.GEMINI_THINKING_ANALISIS, max_tokens=8000, temperatura=0.3, usuario_id=usuario["id"], sesion_id=sesion_id)
             if not isinstance(r.json, dict):
                 raise ErrorLLM("El análisis no devolvió un resultado válido. Pulsa Reintentar análisis.")
-            resultado = {"elena": V.feedback_entrevistas, "celeste": V.feedback_ventas, "juan": V.feedback_dm}[agente.id](r.json, sesion)
+            resultado = V.feedback_generico(r.json, sesion) if es_generico(agente) else {"elena": V.feedback_entrevistas, "celeste": V.feedback_ventas, "juan": V.feedback_dm}[agente.id](r.json, sesion)
             score = agente.score(resultado, sesion)
         resultado["score_global_100"] = score
         resultado["turnos"] = sesion["turnos"]

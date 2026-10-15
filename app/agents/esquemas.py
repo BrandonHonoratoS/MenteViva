@@ -153,3 +153,42 @@ LECCION = _obj({
 ITEM_RM = _obj({"semana": _i(1, 12), "nivel": _s(), "competencia": _s("sólo ruta_dm; vacío en otras"), "objetivo": _s("objetivo medible de la sesión"), "porque": _s("una línea")})
 AJUSTE_PLAN = _obj({"items": _arr(_obj({"n": _i(1, 16), "objetivo": _s("objetivo medible"), "porque": _s("una línea")}), 1, 16)})
 ROADMAP = _obj({"objetivo": _s("meta del plan en una línea"), "razon": _s("por qué este orden, 2-3 líneas"), "items": _arr(ITEM_RM, 3, 16)})
+
+# ── escenarios genéricos (presentaciones, imagen, comunicación, liderazgo) ───
+TURNO_GENERICO = _obj({"mensaje": _s(), "tension": _i(0, 100), "estado": {"type": "string", "enum": ["en_curso", "cerrando", "fin"]}})
+DISENO_GENERICO = _obj({
+    "titulo": _s(), "encuadre": _s("2-3 líneas para la persona"), "personaje": _s("nombre y rol que interpreta el avatar"),
+    "situacion": _s("contexto que verá la persona"), "primer_mensaje": _s("primer turno del avatar ya dentro de la escena"),
+    "tarea": _s("qué debe hacer la persona en la sesión (p. ej. grabar su apertura de 30 s y luego una presentación de 3 min)"),
+    "duracion_objetivo_s": _i(0, 600, "segundos que debe durar la grabación principal; 0 si no aplica"),
+    "dificultad_inicial": _i(1, 5),
+})
+
+
+def feedback_generico(n_kpis: int) -> dict:
+    return _obj({
+        "resumen": _s(), "kpis": _arr(KPI_EVAL, n_kpis, n_kpis),
+        "fortalezas": _arr(FORTALEZA, 1, 3), "oportunidades": _arr(OPORTUNIDAD, 1, 3), "blind_spot": _s(), "momentos_clave": _arr(MOMENTO, 1, 5),
+        "plan_accion": _arr(PASO, 3, 3), "tips": _arr(_s(), 3, 5), "pregunta_para_llevarse": _s(), "recomendacion": RECOMENDACION,
+        "mantener_mejorar_practicar": _obj({"mantener": _s(), "mejorar": _s(), "practicar": _s()}),
+    })
+
+
+# ── audio (grabación de voz) e imagen (foto del outfit) ────────────────────
+AUDIO = _obj({
+    "transcripcion": _s("transcripción fiel, con las muletillas tal cual se dijeron"),
+    "duracion_s": _i(0, 900), "palabras": _i(0, 5000), "palabras_por_minuto": _i(0, 400),
+    "muletillas": _i(0, 500, "conteo total de muletillas (eh, este, o sea, bueno, mmm, ¿no?, etc.)"), "muletillas_detalle": _s("cuáles y cuántas"),
+    "pausas_largas": _i(0, 200, "pausas > 2 s"), "ritmo": {"type": "string", "enum": ["muy lento", "lento", "adecuado", "rápido", "muy rápido"]},
+    "variedad_vocal": {"type": "string", "enum": ["monótona", "poca", "adecuada", "alta"]}, "volumen": {"type": "string", "enum": ["bajo", "adecuado", "alto", "irregular"]},
+    "energia_cierre": {"type": "string", "enum": ["se apaga", "estable", "sube"]}, "seguridad": _i(1, 4, "1 inicial · 4 alto impacto"),
+    "observaciones_voz": _s("2-4 líneas: énfasis, pausas intencionales, dicción, nervios audibles; sin juzgar el contenido"),
+})
+FOTO = _obj({
+    "es_outfit": {"type": "boolean"}, "descripcion": _s("descripción objetiva y completa de la vestimenta visible: prendas, colores, telas, calzado, accesorios, cuidado, ajuste"),
+    "codigo_detectado": {"type": "string", "enum": ["formal de negocios", "business casual", "smart casual", "casual", "casual viernes", "no profesional", "no determinable"]},
+    "ajuste": _s("hombros, puños, caída del pantalón, largo de falda/vestido, talla; lo que se alcanza a ver"),
+    "cuidado": _s("planchado, limpieza, calzado, cabello/arreglo si se ve"), "color": _s("paleta y coherencia"),
+    "accesorios": _s("reloj, joyería, cinturón, bolso, lentes"), "detalles_a_revisar": _arr(_s(), 0, 6),
+    "nota_privacidad": _s("'persona real' o 'imagen de referencia/catálogo'"),
+})

@@ -1,7 +1,7 @@
 """API JSON usada por la interfaz (chat de sesiones, onboarding, chats del analista y del coach)."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
 from .. import db
 from ..config import settings
@@ -49,6 +49,84 @@ async def mensaje(sid: int, request: Request, u: dict = Depends(requiere_usuario
         motor.terminar(s, db.usuario(u["id"]), en_hilo=not settings.ANALISIS_SINCRONO)
     return {"mensaje": r.get("texto"), "meta": {k: v for k, v in r.items() if k != "texto"}, "turnos": s["turnos"],
             "turnos_max": C.turnos_max_sesion(s), "fin": fin}
+
+
+def _respuesta_turno(sid: int, u: dict, r: dict) -> dict:
+    s = db.sesion(sid)
+    fin = r.get("estado") == "fin" or r.get("fase") == "fin"
+    if fin:
+        motor.terminar(s, db.usuario(u["id"]), en_hilo=not settings.ANALISIS_SINCRONO)
+    return {"mensaje": r.get("texto"), "meta": {k: v for k, v in r.items() if k != "texto"}, "turnos": s["turnos"], "turnos_max": C.turnos_max_sesion(s), "fin": fin}
+
+
+def _turno_con_adjunto(sid: int, u: dict, texto: str, meta: dict) -> dict:
+    s = _sesion_propia(sid, u)
+    try:
+        r = motor.turno(s, db.usuario(u["id"]), texto, meta_usuario=meta)
+    except motor.SesionOcupada as e:
+        raise HTTPException(409, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except PresupuestoAgotado as e:
+        raise HTTPException(402, str(e))
+    except ErrorLLM as e:
+        raise HTTPException(503, str(e))
+    return _respuesta_turno(sid, u, r)
+
+
+@router.post("/sesiones/{sid}/audio")
+async def audio(sid: int, request: Request, u: dict = Depends(requiere_usuario), archivo: UploadFile = File(...), csrf: str = Form(""), duracion: float = Form(0.0)):
+    """Grabación de voz: se transcribe y se mide (una llamada), se guarda sólo la transcripción con sus métricas y el avatar responde."""
+    verificar_csrf(request, u, csrf)
+    s = _sesion_propia(sid, u)
+    hab = C.habilidad(s["habilidad"]) or {}
+    if not settings.AUDIO_ENABLED or not hab.get("audio"):
+        raise HTTPException(400, "Esta práctica no usa grabaciones de voz.")
+    if s["estado"] != "en_curso":
+        raise HTTPException(409, "La sesión ya terminó.")
+    from ..agents import adjuntos as AD
+    data = await archivo.read()
+    try:
+        a = AD.transcribir_audio(db.usuario(u["id"]), s, data, archivo.content_type or "", duracion or None)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except PresupuestoAgotado as e:
+        raise HTTPException(402, str(e))
+    except ErrorLLM as e:
+        raise HTTPException(503, str(e))
+    finally:
+        del data   # el audio no se conserva
+    out = _turno_con_adjunto(sid, u, AD.texto_mensaje_audio(a), {"audio": a})
+    out["transcripcion"] = a["transcripcion"]
+    out["audio"] = {k: a[k] for k in ("duracion_s", "ppm", "muletillas", "muletillas_min", "ritmo", "variedad_vocal", "seguridad", "energia_cierre")}
+    return out
+
+
+@router.post("/sesiones/{sid}/foto")
+async def foto(sid: int, request: Request, u: dict = Depends(requiere_usuario), archivo: UploadFile = File(...), csrf: str = Form(""), comentario: str = Form("")):
+    """Foto del outfit (propia o de referencia): se describe de forma objetiva (una llamada), se guarda sólo la descripción y el avatar responde."""
+    verificar_csrf(request, u, csrf)
+    s = _sesion_propia(sid, u)
+    hab = C.habilidad(s["habilidad"]) or {}
+    if not settings.FOTO_ENABLED or not hab.get("foto"):
+        raise HTTPException(400, "Esta práctica no usa fotos.")
+    if s["estado"] != "en_curso":
+        raise HTTPException(409, "La sesión ya terminó.")
+    from ..agents import adjuntos as AD
+    data = await archivo.read()
+    try:
+        f = AD.describir_foto(db.usuario(u["id"]), s, data, archivo.content_type or "")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except PresupuestoAgotado as e:
+        raise HTTPException(402, str(e))
+    except ErrorLLM as e:
+        raise HTTPException(503, str(e))
+    finally:
+        del data   # la imagen no se conserva
+    out = _turno_con_adjunto(sid, u, AD.texto_mensaje_foto(f, comentario[:500]), {"foto": f})
+    out["foto"] = {"codigo_detectado": f["codigo_detectado"], "descripcion": f["descripcion"][:300], "es_outfit": f["es_outfit"]}
+    return out
 
 
 @router.post("/sesiones/{sid}/continuar")

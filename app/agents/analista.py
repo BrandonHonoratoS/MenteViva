@@ -35,7 +35,7 @@ def post_sesion(sesion: dict, usuario: dict) -> None:
     sin_mejora = int(niv.get("sin_mejora") or 0)
     sin_mejora = sin_mejora + 1 if len(scores) >= 2 and scores[-1] <= scores[-2] else 0
 
-    if sesion["habilidad"] in ("ventas", "entrevistas"):
+    if C.es_kpi(sesion["habilidad"]):
         niveles = hab["niveles"]
         i = niveles.index(nivel_actual) if nivel_actual in niveles else 0
         mismos = [s for s in historial if (s.get("nivel") or nivel_actual) == nivel_actual]
