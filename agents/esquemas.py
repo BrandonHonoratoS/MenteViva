@@ -1,0 +1,194 @@
+"""Esquemas JSON de las salidas de los agentes (se pasan a Gemini como response_json_schema)."""
+from __future__ import annotations
+
+
+def _s(desc: str = "") -> dict:
+    return {"type": "string", "description": desc} if desc else {"type": "string"}
+
+
+def _n(lo: float, hi: float, desc: str = "") -> dict:
+    d = {"type": "number", "minimum": lo, "maximum": hi}
+    if desc:
+        d["description"] = desc
+    return d
+
+
+def _i(lo: int, hi: int, desc: str = "") -> dict:
+    d = {"type": "integer", "minimum": lo, "maximum": hi}
+    if desc:
+        d["description"] = desc
+    return d
+
+
+def _arr(items: dict, mn: int = 1, mx: int | None = None) -> dict:
+    d = {"type": "array", "items": items, "minItems": mn}
+    if mx:
+        d["maxItems"] = mx
+    return d
+
+
+def _obj(props: dict, req: list[str] | None = None) -> dict:
+    return {"type": "object", "properties": props, "required": req or list(props.keys())}
+
+
+# ── turnos de conversación ───────────────────────────────────────────────────
+TURNO_ELENA_DIAG = _obj({"mensaje": _s(), "fase": {"type": "string", "enum": ["rapport", "encuadre", "desarrollo", "profundizacion", "cierre", "fin"]},
+                         "historias": _i(0, 10)})
+TURNO_ELENA_PRACT = _obj({"mensaje": _s(), "fase": {"type": "string", "enum": ["rapport", "encuadre", "desarrollo", "profundizacion", "cierre", "fin"]},
+                          "tension": _i(0, 100)})
+TURNO_CELESTE = _obj({"mensaje": _s(), "tension": _i(0, 100), "estado": {"type": "string", "enum": ["en_curso", "cerrando", "fin"]}, "etapa": _s()})
+TURNO_JUAN = _obj({"mensaje": _s(), "tension": _i(0, 100), "estado": {"type": "string", "enum": ["en_curso", "cerrando", "fin"]}})
+RESUMEN = _obj({"memoria": _s()})
+
+# ── diagnóstico de Elena ─────────────────────────────────────────────────────
+COMPETENCIA = _obj({"nombre": _s(), "nivel": _i(0, 5), "justificacion": _s("evidencia observada o 'sin evidencia'")})
+FORTALEZA = _obj({"habilidad": _s(), "evidencia": _s("frase textual o momento"), "por_que_importa": _s()})
+OPORTUNIDAD = _obj({"habilidad": _s(), "evidencia": _s(), "impacto": _s(), "micro_practica": _s("práctica concreta para esta semana")})
+PRIORIDAD = _obj({"habilidad_id": _s("id del catálogo"), "brecha": {"type": "string", "enum": ["alta", "media", "baja"]}, "razon": _s(),
+                  "competencias_relacionadas": _arr(_s(), 0)})
+ELENA_DIAGNOSTICO = _obj({
+    "resumen_ejecutivo": _s("3-4 líneas"),
+    "fortalezas": _arr(FORTALEZA, 1, 3),
+    "oportunidades": _arr(OPORTUNIDAD, 1, 3),
+    "blind_spot": _s(),
+    "pregunta_para_llevarse": _s(),
+    "competencias": _arr(COMPETENCIA, 10, 10),
+    "estilo_comunicacion": _s(),
+    "nivel_ventas": {"type": "string", "enum": ["Principiante", "Intermedio", "Avanzado"]},
+    "nivel_ventas_justificacion": _s(),
+    "nivel_dm": {"type": "string", "enum": ["DM Básico", "DM1", "DM2", "DM3", "DM4", "DM5", "Emprendedor"]},
+    "nivel_dm_justificacion": _s(),
+    "nivel_entrevistas": {"type": "string", "enum": ["Principiante", "Intermedio", "Avanzado"]},
+    "prioridades": _arr(PRIORIDAD, 1, 4),
+    "mensaje_para_la_persona": _s("cierre cálido de 2-3 líneas en voz de Elena"),
+})
+
+# ── feedback de sesiones ─────────────────────────────────────────────────────
+KPI_EVAL = _obj({"id": _s("KPI-1..KPI-6"), "score": _i(0, 100), "evidencia": _s("turno y frase"), "bien": _s(), "mejora": _s()})
+MOMENTO = _obj({"turno": _i(0, 200), "tipo": {"type": "string", "enum": ["destacó", "falló"]}, "que_paso": _s(), "que_habria_cambiado": _s()})
+PASO = _obj({"paso": _s(), "como_medir": _s()})
+RECOMENDACION = _obj({"nivel_sugerido": {"type": "string", "enum": ["Principiante", "Intermedio", "Avanzado"]}, "objetivo_siguiente": _s("objetivo medible"), "razon": _s()})
+
+TECNICA = _obj({"id": _s("T-01..T-08"), "turno": _i(0, 200)})
+EVIDENCIA_VENTAS = _obj({
+    "tecnicas_usadas": _arr(TECNICA, 0),
+    "spin": _obj({"S": _i(0, 50), "P": _i(0, 50), "I": _i(0, 50), "N": _i(0, 50)}),
+    "etapas_cumplidas": _arr(_s(), 0),
+    "turno_primer_descuento": _i(0, 200, "0 si no ofreció descuento"),
+    "uso_silencio_activo": {"type": "boolean"},
+    "objeciones_lanzadas": _i(0, 10), "objeciones_resueltas": _i(0, 10),
+    "cierre": {"type": "string", "enum": ["sin_cierre", "siguiente_paso", "venta", "fallido_por_ceder"]},
+})
+FEEDBACK_VENTAS = _obj({
+    "resumen": _s(), "kpis": _arr(KPI_EVAL, 6, 6), "evidencia": EVIDENCIA_VENTAS,
+    "fortalezas": _arr(FORTALEZA, 1, 3), "oportunidades": _arr(OPORTUNIDAD, 1, 3), "momentos_clave": _arr(MOMENTO, 1, 5),
+    "plan_accion": _arr(PASO, 3, 3), "tips": _arr(_s(), 3, 5), "pregunta_para_llevarse": _s(),
+    "metrica_etapa_debil": _s("cómo le fue en la etapa débil declarada, con número"), "recomendacion": RECOMENDACION,
+})
+FEEDBACK_ENTREVISTAS = _obj({
+    "resumen": _s(), "kpis": _arr(KPI_EVAL, 5, 5),
+    "fortalezas": _arr(FORTALEZA, 1, 3), "oportunidades": _arr(OPORTUNIDAD, 1, 3), "blind_spot": _s(), "momentos_clave": _arr(MOMENTO, 1, 5),
+    "plan_accion": _arr(PASO, 3, 3), "tips": _arr(_s(), 3, 5), "pregunta_para_llevarse": _s(), "recomendacion": RECOMENDACION,
+})
+SUBDIM = _obj({"nombre": _s(), "score": _n(0, 10), "evidencia": _s()})
+BRECHA = _obj({"brecha": _s(), "evidencia": _s(), "impacto_siguiente_nivel": _s(), "causa_probable": _s()})
+PASO_DM = _obj({"paso": _s(), "como_practicar_esta_semana": _s(), "senal_de_logro": _s()})
+FEEDBACK_DM = _obj({
+    "resumen": _s(), "subdimensiones": _arr(SUBDIM, 3, 4), "score_global": _n(0, 10),
+    "nivel_dominio": {"type": "string", "enum": ["Principiante", "En desarrollo", "Sólido", "Listo para el siguiente nivel"]}, "justificacion": _s(),
+    "fortalezas": _arr(FORTALEZA, 1, 3), "brechas": _arr(BRECHA, 1, 3),
+    "momento_clave": _obj({"que_hizo": _s(), "alternativa": _s(), "que_habria_cambiado": _s()}),
+    "plan_accion": _arr(PASO_DM, 3, 4), "tips": _arr(_s(), 3, 5),
+    "siguiente_paso": _obj({"competencia": _s(), "por_que": _s()}),
+})
+TURNO_LAB = _obj({"mensaje": _s(), "accion": {"type": "string", "enum": ["avanzar", "profundizar", "fin"]}, "tension": _i(0, 100)})
+EVENTO_LAB = _obj({"titulo": _s(), "texto": _s("diálogos y nueva información que ve la persona"), "pregunta": _s("una sola pregunta abierta"),
+                   "evalua": _s("conductas a observar en silencio")})
+CASO_LAB = _obj({"titulo": _s(), "contexto": _s("2-3 líneas"), "personajes": _s("roles separados por coma"), "eventos": _arr(EVENTO_LAB, 5, 5)})
+CASOS_LAB = _obj({"casos": _arr(CASO_LAB, 2, 2)})
+DIM_LAB = _obj({"id": {"type": "string", "enum": ["escucha", "estres", "pmbok", "comunicacion"]}, "puntos": _n(0, 30),
+                "radar": {"type": "string", "enum": ["Fortalecido", "Sólido", "En desarrollo", "Requiere atención"]}, "lectura": _s("patrones observados")})
+FORTALEZA_LAB = _obj({"nombre": _s(), "evidencia": _s("qué hizo la persona"), "por_que": _s("por qué es valioso profesionalmente")})
+OPORTUNIDAD_LAB = _obj({"nombre": _s(), "observado": _s(), "riesgo": _s(), "como_fortalecer": _s(), "material": _s("práctica o modelo del material de capacitación con el que se relaciona")})
+MOMENTO_LAB = _obj({"situacion": _s(), "respuesta": _s(), "lectura": _s()})
+FEEDBACK_LAB = _obj({
+    "sintesis": _s("máximo 5 líneas"), "dimensiones": _arr(DIM_LAB, 4, 4),
+    "fortalezas": _arr(FORTALEZA_LAB, 1, 3), "oportunidades": _arr(OPORTUNIDAD_LAB, 1, 3), "momentos_clave": _arr(MOMENTO_LAB, 3, 5),
+    "recomendaciones": _arr(_s(), 3, 5),
+    "prioridad": _obj({"dimension": {"type": "string", "enum": ["escucha", "estres", "pmbok", "comunicacion"]}, "por_que": _s(), "que_practicar": _arr(_s(), 1, 3)}),
+    "cierre": _s(),
+})
+JUAN_DISENO = _obj({
+    "formato": {"type": "string", "enum": ["roleplay", "caso", "reto"]}, "titulo": _s(), "encuadre": _s(), "personaje": _s(),
+    "situacion": _s(), "primer_mensaje": _s(), "subdimensiones": _arr(_s(), 3, 4), "dificultad_inicial": _i(1, 5),
+})
+
+# ── analista ─────────────────────────────────────────────────────────────────
+ANALISTA_POST = _obj({
+    "lectura": _s(), "riesgo": {"type": "string", "enum": ["bajo", "medio", "alto"]}, "riesgo_motivo": _s(), "recomendacion_lider": _s(),
+    "siguiente_objetivo": _s(), "ajuste_plan": {"type": "string", "enum": ["ninguno", "refuerzo", "subir_nivel", "bajar_nivel", "cambiar_foco"]},
+    "ajuste_motivo": _s(), "senales": _arr(_s(), 2, 4),
+})
+RECO = _obj({"accion": _s(), "responsable": _s(), "senal_exito": _s(), "prioridad": {"type": "string", "enum": ["alta", "media", "baja"]}})
+ANALISTA_RESUMEN = _obj({"titulo": _s(), "resumen": _s(), "avanzan": _arr(_s(), 0, 5), "atencion": _arr(_s(), 0, 5), "recomendaciones": _arr(RECO, 1, 3)})
+HALLAZGO = _obj({"hallazgo": _s(), "fuente": _s("dominio o título")})
+INVESTIGACION = _obj({"hallazgos": _arr(HALLAZGO, 1, 5), "aplicacion": _s(), "confianza": {"type": "string", "enum": ["alto", "medio", "bajo"]}, "confianza_motivo": _s()})
+
+# ── Sócrates: lección ────────────────────────────────────────────────────────
+MARCO = _obj({"nombre": _s(), "origen": _s("autor/obra/año u organismo"), "que_es": _s(), "como_aplicarlo": _s(), "ejemplo": _s("en el contexto de la persona")})
+PASO_LECCION = _obj({"nombre": _s(), "que_hacer": _s(), "frase_o_accion": _s(), "error_tipico": _s()})
+FILA_COMP = _obj({"situacion": _s(), "enfoque_debil": _s(), "enfoque_experto": _s()})
+ERROR_LECCION = _obj({"error": _s(), "por_que_ocurre": _s(), "alternativa": _s()})
+PREGUNTA_SOC = _obj({"pregunta": _s(), "pista": _s(), "respuesta_modelo": _s()})
+FUENTE_LECCION = _obj({"autor_u_organismo": _s(), "obra": _s(), "anio": _s(), "url": _s("vacío si no hay"), "para_que": _s()})
+LECCION = _obj({
+    "titulo": _s(), "gancho": _s(), "idea_central": _s(), "duracion_min": _i(5, 40),
+    "mapa_mermaid": _s("flowchart TD con nodos A[\"...\"] --> B[\"...\"]"),
+    "marcos": _arr(MARCO, 3, 5), "proceso": _arr(PASO_LECCION, 4, 7), "comparativa": _arr(FILA_COMP, 3, 5), "errores_comunes": _arr(ERROR_LECCION, 3, 5),
+    "caso": _obj({"titulo": _s(), "narrativa": _s(), "lectura": _s()}),
+    "preguntas_socraticas": _arr(PREGUNTA_SOC, 4, 6), "checklist_practica": _arr(_s(), 5, 7), "cierre": _s(), "fuentes": _arr(FUENTE_LECCION, 3, 8),
+})
+
+# ── roadmaps ─────────────────────────────────────────────────────────────────
+ITEM_RM = _obj({"semana": _i(1, 12), "nivel": _s(), "competencia": _s("sólo ruta_dm; vacío en otras"), "objetivo": _s("objetivo medible de la sesión"), "porque": _s("una línea")})
+AJUSTE_PLAN = _obj({"items": _arr(_obj({"n": _i(1, 16), "objetivo": _s("objetivo medible"), "porque": _s("una línea")}), 1, 16)})
+ROADMAP = _obj({"objetivo": _s("meta del plan en una línea"), "razon": _s("por qué este orden, 2-3 líneas"), "items": _arr(ITEM_RM, 3, 16)})
+
+# ── escenarios genéricos (presentaciones, imagen, comunicación, liderazgo) ───
+TURNO_GENERICO = _obj({"mensaje": _s(), "tension": _i(0, 100), "estado": {"type": "string", "enum": ["en_curso", "cerrando", "fin"]}})
+DISENO_GENERICO = _obj({
+    "titulo": _s(), "encuadre": _s("2-3 líneas para la persona"), "personaje": _s("nombre y rol que interpreta el avatar"),
+    "situacion": _s("contexto que verá la persona"), "primer_mensaje": _s("primer turno del avatar ya dentro de la escena"),
+    "tarea": _s("qué debe hacer la persona en la sesión (p. ej. grabar su apertura de 30 s y luego una presentación de 3 min)"),
+    "duracion_objetivo_s": _i(0, 600, "segundos que debe durar la grabación principal; 0 si no aplica"),
+    "dificultad_inicial": _i(1, 5),
+})
+
+
+def feedback_generico(n_kpis: int) -> dict:
+    return _obj({
+        "resumen": _s(), "kpis": _arr(KPI_EVAL, n_kpis, n_kpis),
+        "fortalezas": _arr(FORTALEZA, 1, 3), "oportunidades": _arr(OPORTUNIDAD, 1, 3), "blind_spot": _s(), "momentos_clave": _arr(MOMENTO, 1, 5),
+        "plan_accion": _arr(PASO, 3, 3), "tips": _arr(_s(), 3, 5), "pregunta_para_llevarse": _s(), "recomendacion": RECOMENDACION,
+        "mantener_mejorar_practicar": _obj({"mantener": _s(), "mejorar": _s(), "practicar": _s()}),
+    })
+
+
+# ── audio (grabación de voz) e imagen (foto del outfit) ────────────────────
+AUDIO = _obj({
+    "transcripcion": _s("transcripción fiel, con las muletillas tal cual se dijeron"),
+    "duracion_s": _i(0, 900), "palabras": _i(0, 5000), "palabras_por_minuto": _i(0, 400),
+    "muletillas": _i(0, 500, "conteo total de muletillas (eh, este, o sea, bueno, mmm, ¿no?, etc.)"), "muletillas_detalle": _s("cuáles y cuántas"),
+    "pausas_largas": _i(0, 200, "pausas > 2 s"), "ritmo": {"type": "string", "enum": ["muy lento", "lento", "adecuado", "rápido", "muy rápido"]},
+    "variedad_vocal": {"type": "string", "enum": ["monótona", "poca", "adecuada", "alta"]}, "volumen": {"type": "string", "enum": ["bajo", "adecuado", "alto", "irregular"]},
+    "energia_cierre": {"type": "string", "enum": ["se apaga", "estable", "sube"]}, "seguridad": _i(1, 4, "1 inicial · 4 alto impacto"),
+    "observaciones_voz": _s("2-4 líneas: énfasis, pausas intencionales, dicción, nervios audibles; sin juzgar el contenido"),
+})
+FOTO = _obj({
+    "es_outfit": {"type": "boolean"}, "descripcion": _s("descripción objetiva y completa de la vestimenta visible: prendas, colores, telas, calzado, accesorios, cuidado, ajuste"),
+    "codigo_detectado": {"type": "string", "enum": ["formal de negocios", "business casual", "smart casual", "casual", "casual viernes", "no profesional", "no determinable"]},
+    "ajuste": _s("hombros, puños, caída del pantalón, largo de falda/vestido, talla; lo que se alcanza a ver"),
+    "cuidado": _s("planchado, limpieza, calzado, cabello/arreglo si se ve"), "color": _s("paleta y coherencia"),
+    "accesorios": _s("reloj, joyería, cinturón, bolso, lentes"), "detalles_a_revisar": _arr(_s(), 0, 6),
+    "nota_privacidad": _s("'persona real' o 'imagen de referencia/catálogo'"),
+})

@@ -1,0 +1,23 @@
+{% extends "base.html" %}{% block title %}Aprobaciones{% endblock %}
+{% block subtitulo %}Lo que el Analista propone con evidencia; una persona decide{% endblock %}
+{% block content %}
+<div class="tabs">{% for e, n in [('pendiente','Pendientes'),('aprobada','Aprobadas'),('rechazada','Rechazadas'),('todas','Todas')] %}<a href="/aprobaciones?estado={{ e }}" class="{{ 'on' if estado == e }}">{{ n }}</a>{% endfor %}</div>
+{% for p in propuestas %}
+<div class="card mb" style="margin-bottom:14px">
+  <div class="row between">
+    <div><span class="chip {{ {'ascenso_dm':'mint','roadmap':'aqua','refuerzo':'amber','alerta':'rose','ajuste':'gris','meta':'gris'}[p.tipo] }}">{{ p.tipo|replace('_',' ') }}</span> <span class="chip {{ {'pendiente':'amber','aprobada':'mint','rechazada':'rose','atendida':'gris'}[p.estado] }}">{{ p.estado }}</span>
+      <h2 style="margin-top:8px">{{ p.titulo }}</h2>
+      <p class="small">{{ p.evidencia }}</p>
+      {% if p.tipo == 'ascenso_dm' and p.detalle.scores %}<div class="row">{% for c, s in p.detalle.scores.items() %}<span class="chip {{ 'mint' if s >= 9 else ('aqua' if s >= 7 else 'amber') }}">{{ c }} {{ s }}</span>{% endfor %}</div>{% endif %}
+      {% if p.detalle.detalle %}<p class="muted small">{{ p.detalle.detalle }}</p>{% endif %}
+      <div class="soft tiny">{{ p.creado_por }} · {{ p.creado_en|fecha }}{% if p.usuario_nombre %} · <a href="/colaborador/{{ p.usuario_id }}">{{ p.usuario_nombre }}</a>{% endif %}{% if p.decisor_nombre %} · decidió {{ p.decisor_nombre }} {{ p.decidido_en|fecha }}{% if p.motivo %}: “{{ p.motivo }}”{% endif %}{% endif %}</div>
+    </div>
+    {% if p.estado == 'pendiente' %}
+    <form method="post" action="/aprobaciones/{{ p.id }}" class="stack" style="min-width:260px"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <input name="motivo" placeholder="Motivo (opcional)">
+      <div class="row">{% if p.tipo in ('ascenso_dm','roadmap','refuerzo','ajuste','meta') %}<button class="btn primary sm" name="decision" value="aprobada" type="submit">Aprobar</button><button class="btn sm danger" name="decision" value="rechazada" type="submit">Rechazar</button>{% else %}<button class="btn primary sm" name="decision" value="atendida" type="submit">Marcar atendida</button>{% endif %}</div></form>
+    {% endif %}
+  </div>
+</div>
+{% else %}<div class="empty">Nada por aquí.</div>{% endfor %}
+{% endblock %}

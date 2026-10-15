@@ -1,0 +1,100 @@
+{% extends "base.html" %}{% block title %}{{ c.titulo or lec.tema }}{% endblock %}
+{% block subtitulo %}Master class de Sócrates · {{ hab.nombre }}{% if lec.competencia %} · {{ lec.competencia }}{% endif %}{% if c.duracion_min %} · ~{{ c.duracion_min }} min{% endif %}{% if not propia %} · {{ lec.usuario_nombre }}{% endif %}{% endblock %}
+{% block content %}
+{% if lec.estado == 'generando' %}
+<div class="card hero" id="lec-espera" data-id="{{ lec.id }}">
+  <div class="orb-wrap" style="padding:30px 0"><div class="orb thinking" style="--c1:{{ avatar.color }};--c2:#A855F7"></div><b>Sócrates está preparando tu master class</b>
+    <span class="muted small">Investiga fuentes de referencia y la adapta a tu trabajo. Tarda 1–2 minutos; esta página se actualiza sola.</span></div>
+</div>
+{% elif lec.estado == 'error' %}
+<div class="card hero"><div class="alert err">{{ lec.error }}</div>
+  {% if propia %}<form method="post" action="/socrates/{{ lec.id }}/reintentar"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn primary mt" type="submit">Reintentar</button></form>{% endif %}</div>
+{% else %}
+<div class="grid g-2-1">
+  <div class="stack">
+    <div class="card hero">
+      <div class="row" style="gap:26px">
+        <div class="orb-wrap"><div class="orb" style="--c1:{{ avatar.color }};--c2:#A855F7"></div><b>{{ avatar.nombre }}</b><span class="muted tiny">tutor</span></div>
+        <div style="flex:1;min-width:240px">
+          <h2 style="font-size:1.5rem">{{ c.titulo }}</h2>
+          <p>{{ c.gancho }}</p>
+          <div class="alert info"><b>Idea central:</b> {{ c.idea_central }}</div>
+          {% if item %}<span class="chip mint">Prepara: {{ item.objetivo }}</span>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="tabs" id="lec-tabs">
+      <button class="on" data-tab="mapa">Mapa y marcos</button><button data-tab="proceso">Proceso y caso</button><button data-tab="preguntas">Preguntas y checklist</button><button data-tab="fuentes">Fuentes</button>
+    </div>
+
+    <div class="tab-pane" data-pane="mapa">
+      {% if c.mapa_mermaid %}
+      <div class="card"><h2>Mapa conceptual</h2>
+        <div class="mermaid-box" id="mapa"><pre class="mermaid-src" style="display:none">{{ c.mapa_mermaid }}</pre><div class="muted small">Dibujando el mapa…</div></div>
+      </div>
+      {% endif %}
+      <div class="card"><h2>Marcos y modelos de referencia</h2>
+        {% for mk in c.marcos %}
+        <details class="marco" {{ 'open' if loop.first }}>
+          <summary><b>{{ loop.index }}. {{ mk.nombre }}</b> <span class="muted small">— {{ mk.origen }}</span></summary>
+          <div class="grid g2 mt">
+            <div><div class="cap">Qué es</div><p class="small">{{ mk.que_es }}</p><div class="cap">Cómo aplicarlo en tu caso</div><p class="small">{{ mk.como_aplicarlo }}</p></div>
+            <div class="soft" style="padding:12px;border-radius:12px;background:var(--surface-2)"><div class="cap">Ejemplo en tu contexto</div><p class="small" style="white-space:pre-wrap">{{ mk.ejemplo }}</p></div>
+          </div>
+        </details>
+        {% endfor %}
+      </div>
+      {% if c.comparativa %}
+      <div class="card"><h2>Lo que distingue a un experto</h2>
+        <table><thead><tr><th>Situación</th><th>Enfoque débil</th><th>Enfoque experto</th></tr></thead><tbody>
+        {% for f in c.comparativa %}<tr><td><b>{{ f.situacion }}</b></td><td class="small down">{{ f.enfoque_debil }}</td><td class="small up">{{ f.enfoque_experto }}</td></tr>{% endfor %}
+        </tbody></table></div>
+      {% endif %}
+    </div>
+
+    <div class="tab-pane" data-pane="proceso" style="display:none">
+      <div class="card"><h2>Proceso paso a paso</h2>
+        <div class="timeline">{% for p in c.proceso %}<div class="tl-item done"><span class="chip">Paso {{ loop.index }}</span><div class="mt" style="margin-top:6px"><b>{{ p.nombre }}</b></div><div class="small">{{ p.que_hacer }}</div><div class="small soft" style="margin-top:4px"><b>Qué dirías / harías:</b> {{ p.frase_o_accion }}</div><div class="tiny muted">Error típico: {{ p.error_tipico }}</div></div>{% endfor %}</div>
+      </div>
+      <div class="card"><h2>Caso resuelto · {{ c.caso.titulo }}</h2><p style="white-space:pre-wrap">{{ c.caso.narrativa }}</p><div class="alert info mt"><b>Lectura:</b> {{ c.caso.lectura }}</div></div>
+      <div class="card"><h2>Errores comunes</h2>{% for e in c.errores_comunes %}<div class="mb"><b class="down">✕ {{ e.error }}</b><div class="small muted">{{ e.por_que_ocurre }}</div><div class="small up">→ {{ e.alternativa }}</div></div>{% endfor %}</div>
+    </div>
+
+    <div class="tab-pane" data-pane="preguntas" style="display:none">
+      <div class="card"><h2>Preguntas socráticas</h2><p class="muted small">Responde cada una pensando en tu situación real antes de abrir la respuesta modelo.</p>
+        {% for q in c.preguntas_socraticas %}
+        <div class="mb" style="padding:12px;border:1px solid var(--line);border-radius:14px"><b>{{ loop.index }}. {{ q.pregunta }}</b>
+          <details class="mt"><summary class="small">Pista</summary><p class="small">{{ q.pista }}</p></details>
+          <details><summary class="small">Respuesta modelo</summary><p class="small">{{ q.respuesta_modelo }}</p></details></div>
+        {% endfor %}
+      </div>
+      <div class="card"><h2>Checklist para tu siguiente sesión</h2><ul class="list">{% for x in c.checklist_practica %}<li><span class="n">☐</span><div class="small">{{ x }}</div></li>{% endfor %}</ul>
+        <div class="alert info mt">{{ c.cierre }}</div>
+        {% if item and propia %}<a class="btn primary mt" href="{{ '/laboratorio?item=' ~ item.id if item.tipo == 'laboratorio' else '/entrenar/' ~ lec.habilidad ~ '?item=' ~ item.id }}">Ir a practicar →</a>{% endif %}
+      </div>
+    </div>
+
+    <div class="tab-pane" data-pane="fuentes" style="display:none">
+      <div class="card"><h2>Fuentes y lecturas</h2><p class="muted small">Referencias verificadas con búsqueda al generar la lección, más los materiales internos de Mente Viva.</p>
+        {% for f in c.fuentes %}<div class="mb small"><b>{{ f.autor_u_organismo }}</b> — <i>{{ f.obra }}</i>{% if f.anio and f.anio != 's.f.' %} ({{ f.anio }}){% endif %}{% if f.url %} · <a href="{{ f.url }}" target="_blank" rel="noopener">{{ f.url|replace('https://','')|replace('http://','')|truncate(60) }}</a>{% endif %}<div class="muted tiny">{{ f.para_que }}</div></div>{% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="stack">
+    {% if propia and chat is not none %}
+    <div class="card">
+      <h2>Pregúntale a Sócrates</h2><p class="muted small">Dudas, otro ejemplo en tu contexto, ampliar un marco o retarte con una pregunta.</p>
+      <div data-chat="/api/socrates/{{ lec.id }}/chat" data-quien="Sócrates">
+        <div class="msgs" style="max-height:360px;min-height:140px">{% for msg in chat.mensajes %}<div class="msg {{ 'usuario' if msg.rol == 'usuario' else 'avatar' }}"><span class="who">{{ 'Tú' if msg.rol == 'usuario' else 'Sócrates' }}</span>{{ msg.texto }}</div>{% endfor %}</div>
+        <div class="composer"><textarea placeholder="Ej. ¿Cómo aplico esto cuando el cliente ya tiene proveedor?"></textarea><button class="btn primary enviar" type="button">Enviar</button></div>
+      </div>
+      <div class="row mt" style="gap:6px;flex-wrap:wrap"><button class="btn sm" data-sugerencia="Dame otro ejemplo en mi contexto del marco 1." type="button">Otro ejemplo</button><button class="btn sm" data-sugerencia="Rétame con una pregunta difícil sobre este tema." type="button">Rétame</button><button class="btn sm" data-sugerencia="¿Qué evidencia respalda el punto más importante de la lección?" type="button">Evidencia</button></div>
+    </div>
+    {% endif %}
+    <div class="card"><div class="cap">Lectura por bloques de 5 minutos</div><ol class="small" style="padding-left:18px;margin:6px 0"><li>Mapa y marcos</li><li>Proceso y caso</li><li>Preguntas y checklist</li></ol><div class="muted tiny">Generada {{ lec.lista_en|fecha if lec.lista_en else '' }} · {{ c.fuentes|length }} fuentes</div></div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

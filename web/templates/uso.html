@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block title %}Uso de IA{% endblock %}
+{% block subtitulo %}Periodo {{ periodo }} · {{ uso.llamadas }} llamadas · {{ uso.costo_usd|round(4) }} USD ≈ {{ (uso.costo_usd * presupuesto_full.tipo_cambio)|round(2) }} MXN{% endblock %}
+{% block content %}
+<div class="grid g-2-1 mb">
+  <div class="card"><h2>Costo por día (USD)</h2><div style="height:220px"><canvas data-bar='{{ {"labels": uso.por_dia|map(attribute="dia")|list, "values": uso.por_dia|map(attribute="costo_usd")|list}|tojson_safe }}'></canvas></div></div>
+  <div class="card"><h2>Presupuesto</h2><div class="score-big grad-text">{{ presupuesto_full.pct }}%</div><div class="muted">{{ presupuesto_full.gastado_mxn }} de {{ presupuesto_full.presupuesto_mxn|round(0)|int }} MXN</div><div class="bar mt"><i style="width:{{ [presupuesto_full.pct,100]|min }}%"></i></div>
+    <p class="small mt">Tokens: {{ uso.tok_in }} entrada · {{ uso.tok_out }} salida · {{ uso.tok_think }} pensamiento · {{ uso.tok_cache }} en caché · {{ uso.grounded }} búsquedas.</p></div>
+</div>
+<div class="card"><h2>Por origen</h2>
+  <table><thead><tr><th>Origen</th><th class="tright">Llamadas</th><th class="tright">Entrada</th><th class="tright">Salida</th><th class="tright">USD</th></tr></thead><tbody>
+  {% for o in uso.por_origen %}<tr><td class="mono small">{{ o.origen }}</td><td class="tright">{{ o.llamadas }}</td><td class="tright">{{ o.tok_in }}</td><td class="tright">{{ o.tok_out }}</td><td class="tright">{{ o.costo_usd|round(4) }}</td></tr>{% else %}<tr><td colspan="5" class="empty">Sin uso este periodo.</td></tr>{% endfor %}
+  </tbody></table></div>
+{% endblock %}

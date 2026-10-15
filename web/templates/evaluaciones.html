@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block title %}Evaluaciones{% endblock %}
+{% block subtitulo %}Evaluación del líder (mensual) y autoevaluación · alimentan aplicación, transferencia y evolución conductual{% endblock %}
+{% block content %}
+<div class="card">
+  <table><thead><tr><th>Colaborador</th><th>Área</th><th>Líder · último periodo</th><th class="tright">Promedio</th><th>Auto · último periodo</th><th class="tright">Promedio</th></tr></thead><tbody>
+  {% for f in filas %}<tr class="link" data-href="/colaborador/{{ f.u.id }}"><td><b>{{ f.u.nombre }}</b></td><td>{{ f.u.area_nombre or '—' }}</td><td>{{ f.lider.periodo if f.lider else '—' }}{% if f.lider and f.lider.periodo != periodo %} <span class="chip amber">pendiente {{ periodo }}</span>{% elif not f.lider %} <span class="chip rose">sin evaluar</span>{% endif %}</td><td class="tright">{{ f.lider.promedio if f.lider else '—' }}</td><td>{{ f.auto.periodo if f.auto else '—' }}</td><td class="tright">{{ f.auto.promedio if f.auto else '—' }}</td></tr>{% endfor %}
+  </tbody></table>
+</div>
+{% endblock %}
