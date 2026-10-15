@@ -27,6 +27,11 @@
       <div class="row between small"><span class="muted">Versión en ejecución</span><span class="chip">v{{ datos.version }}</span></div>
       <a class="btn sm mt" href="/admin/respaldo.db">⬇ Descargar respaldo (.db)</a>
       <p class="muted tiny mt">Las actualizaciones de la plataforma nunca borran datos: el esquema se crea sólo si no existe y el superadmin/empresa inicial sólo si la base está vacía. Descarga un respaldo antes de cada deploy por tranquilidad; para restaurar, copia el archivo a DATA_DIR/mente_viva.db con el servicio detenido.</p></div>
+    <div class="card"><h2>Correo y recordatorios</h2>
+      <div class="row between small"><span class="muted">Envío por correo</span>{% if correo.activo %}<span class="chip mint">activo · {{ correo.host }}:{{ correo.puerto }} · desde {{ correo.desde }}</span>{% else %}<span class="chip amber">no configurado (los avisos se quedan en la plataforma)</span>{% endif %}</div>
+      <div class="row between small"><span class="muted">Recordatorios “Prepárate 5 minutos”</span><span>{{ correo.micro_horas|join(':00, ') }}:00 (lun–vie) · variable MICRO_HORAS</span></div>
+      <form method="post" action="/admin/correo/probar" class="inline-form mt"><input type="hidden" name="csrf" value="{{ csrf }}"><div class="field"><input name="destinatario" type="email" placeholder="correo de prueba (vacío = el tuyo)"></div><button class="btn sm" type="submit">Enviar prueba</button></form>
+      <p class="muted tiny">Variables en Render → Environment: SMTP_HOST, SMTP_PORT (587 STARTTLS o 465 SSL), SMTP_USER, SMTP_PASSWORD, SMTP_FROM. Gmail/Workspace: smtp.gmail.com + contraseña de aplicación. Cada persona puede apagar sus correos en “Mi cuenta”.</p></div>
     <div class="card"><h2>Superadministradores</h2>{% for s in superadmins %}<div class="row between small"><span>{{ s.nombre }} <span class="muted">{{ s.email }}</span></span><span class="chip {{ 'mint' if s.activo else 'gris' }}">{{ 'activo' if s.activo else 'inactivo' }}</span></div>{% endfor %}
       <form method="post" action="/admin/superadmins" class="inline-form mt"><input type="hidden" name="csrf" value="{{ csrf }}"><div class="field"><input name="nombre" placeholder="Nombre"></div><div class="field"><input name="email" type="email" placeholder="correo@menteviva.mx" required></div><button class="btn sm" type="submit">Agregar</button></form></div>
   </div>
@@ -43,6 +48,7 @@
       <div class="mb" style="padding:12px;border:1px solid var(--line);border-radius:14px">
         <div class="row between"><div><b>{{ e.nombre }}</b> <span class="chip {{ 'mint' if e.activa else 'gris' }}">{{ 'activa' if e.activa else 'inactiva' }}</span><div class="muted tiny">{{ e.industria or '—' }} · {{ e.usuarios }} usuarios · creada {{ e.creado_en|fecha_corta }}</div></div>
           <form method="post" action="/admin/empresas/{{ e.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="{{ 'desactivar' if e.activa else 'activar' }}"><button class="btn sm" type="submit">{{ 'Desactivar' if e.activa else 'Activar' }}</button></form></div>
+        <a class="btn sm mt" href="/admin/empresas/{{ e.id }}/estandares">Metodología y estándares</a>
         <form method="post" action="/admin/empresas/{{ e.id }}" class="row mt"><input type="hidden" name="csrf" value="{{ csrf }}">{% for h in personalizadas %}<label class="row small" style="margin:0"><input type="checkbox" name="habilidades" value="{{ h.id }}" style="width:auto" {{ 'checked' if h.id in e.habilidades }}> {{ h.nombre }}</label>{% endfor %}<button class="btn sm" type="submit">Guardar habilidades</button></form>
         {% for x in rrhh_por_empresa.get(e.id, []) %}
         <form method="post" action="/admin/usuarios/{{ x.id }}/password" class="inline-form mt"><input type="hidden" name="csrf" value="{{ csrf }}">

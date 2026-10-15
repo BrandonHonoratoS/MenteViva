@@ -34,8 +34,10 @@ def _colaborador_con_diagnostico(client, stub, email: str, nombre: str) -> Sesio
     try:
         rrhh = Sesion(client, "rrhh@condor.mx", "NuevaClaveRRHH1")      # contraseña cambiada por test_flujo
     except AssertionError:
+        db.limpiar_intentos("ip:testclient")
         rrhh = Sesion(client, "rrhh@condor.mx", "ClaveRRHH123")
         rrhh.cambiar_password("NuevaClaveRRHH1")
+    db.limpiar_intentos("ip:testclient")   # el intento fallido de arriba no debe bloquear a otras pruebas
     eid = rrhh.u["empresa_id"]
     emp = db.empresa(eid)
     if "ruta_dm" not in (emp.get("habilidades") or []):

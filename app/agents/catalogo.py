@@ -168,16 +168,19 @@ def semaforo(score: float | None) -> str:
 # ── Variables de onboarding (chips) ──────────────────────────────────────────
 # Cada variable: id, pregunta, opciones (valor→efecto), grupo. `multiple` permite varias.
 ONBOARDING: list[dict] = [
-    {"id": "funciones", "grupo": "Tu rol", "pregunta": "¿Qué haces en tu trabajo? (elige todo lo que aplique)", "multiple": True,
-     "opciones": ["Vendo o asesoro a clientes", "Entrevisto o selecciono personas", "Lidero personas o proyectos", "Ejecuto proyectos / consultoría",
-                  "Genero negocio nuevo", "Otro"]},
-    {"id": "industria", "grupo": "Tu rol", "pregunta": "¿En qué industria operan tus clientes?",
+    {"id": "contexto", "grupo": "Tu rol", "pregunta": "¿Cuál describe mejor tu situación hoy?",
+     "opciones": ["Trabajo en una empresa", "Tengo mi negocio u oficio", "Estudio", "Me dedico al hogar y la familia", "Estoy buscando empleo", "Otra"]},
+    {"id": "funciones", "grupo": "Tu rol", "pregunta": "¿Qué haces en tu día a día? (elige todo lo que aplique)", "multiple": True,
+     "opciones": ["Vendo o asesoro a clientes", "Atiendo clientes en mi negocio u oficio", "Entrevisto o selecciono personas", "Lidero personas o proyectos",
+                  "Ejecuto proyectos / consultoría", "Genero negocio nuevo", "Estudio", "Cuido mi hogar / familia", "Busco empleo", "Otro"]},
+    {"id": "industria", "grupo": "Tu rol", "pregunta": "¿Con qué tipo de clientes o personas tratas?",
      "opciones": ["Manufactura / industria", "Salud / farmacéutico", "Retail / comercio", "Tecnología / startups", "Educación", "Construcción / bienes raíces",
-                  "Servicios profesionales", "Gobierno", "Otra"]},
-    {"id": "experiencia", "grupo": "Tu rol", "pregunta": "¿Cuánta experiencia profesional tienes?",
+                  "Servicios profesionales", "Gobierno", "Personas y familias (clientes particulares)", "Otra"]},
+    {"id": "experiencia", "grupo": "Tu rol", "pregunta": "¿Cuánta experiencia tienes en lo que haces?",
      "opciones": ["Estoy empezando (0–6 meses)", "Menos de 2 años", "2 a 5 años", "Más de 5 años"]},
     {"id": "tipo_producto", "grupo": "Ventas", "pregunta": "¿Qué vendes o venderás?",
-     "opciones": ["Software / SaaS", "Servicios profesionales", "Producto físico / retail", "Inmuebles / bienes raíces", "Seguros / finanzas", "Otro"]},
+     "opciones": ["Software / SaaS", "Servicios profesionales", "Producto físico / retail", "Inmuebles / bienes raíces", "Seguros / finanzas",
+                  "Oficio o servicio local (cerrajería, plomería, estética, reparaciones…)", "Comida, artesanía o venta por catálogo", "Otro"]},
     {"id": "modelo_venta", "grupo": "Ventas", "pregunta": "¿A quién le vendes?",
      "opciones": ["A personas (B2C)", "A empresas (B2B)", "A gobierno / instituciones (B2G)", "A ambos (mixto)"]},
     {"id": "canal_venta", "grupo": "Ventas", "pregunta": "¿Cómo contactas a tus prospectos?",
@@ -206,8 +209,11 @@ ONBOARDING: list[dict] = [
     {"id": "tiempo_semana", "grupo": "Tu plan", "pregunta": "¿Cuánto tiempo puedes dedicar a practicar cada semana?",
      "opciones": ["15 min", "30 min", "1 hora", "Más de 1 hora"]},
     {"id": "meta", "grupo": "Tu plan", "pregunta": "¿Cuál es tu meta principal?",
-     "opciones": ["Mejorar en mi rol actual", "Ascender en la ruta de desarrollo", "Capacitar a mi equipo", "Conseguir un nuevo puesto", "Certificarme"]},
+     "opciones": ["Mejorar en mi rol actual", "Ascender en la ruta de desarrollo", "Capacitar a mi equipo", "Conseguir un nuevo puesto", "Certificarme",
+                  "Vender más en mi negocio", "Comunicarme mejor con mi familia y comunidad", "Prepararme para mi primer empleo"]},
 ]
+FUNCIONES_VENTA = {"Vendo o asesoro a clientes", "Atiendo clientes en mi negocio u oficio", "Genero negocio nuevo"}
+FUNCIONES_ENTREVISTA = {"Entrevisto o selecciono personas", "Busco empleo"}
 
 GRUPO_VENTAS_IDS = [v["id"] for v in ONBOARDING if v["grupo"] == "Ventas"]
 GRUPO_DM_IDS = [v["id"] for v in ONBOARDING if v["grupo"] == "Ruta DM"]
@@ -218,19 +224,49 @@ def sesiones_por_semana(tiempo_semana: str) -> int:
 
 
 def habilidades_que_usa(onboarding: dict) -> set[str]:
-    """Habilidades que forman parte del rol declarado (sus roadmaps se activan sin aprobación)."""
+    """Habilidades que forman parte de la vida real declarada (sus roadmaps se activan sin aprobación)."""
     f = set(onboarding.get("funciones") or [])
+    ctx = onboarding.get("contexto", "")
+    meta = onboarding.get("meta", "")
     usa: set[str] = set()
-    if f & {"Vendo o asesoro a clientes", "Genero negocio nuevo"}:
+    if f & FUNCIONES_VENTA or ctx == "Tengo mi negocio u oficio" or meta == "Vender más en mi negocio":
         usa.add("ventas")
-    if "Entrevisto o selecciono personas" in f:
+    if f & FUNCIONES_ENTREVISTA or ctx in ("Estoy buscando empleo", "Estudio") or meta in ("Conseguir un nuevo puesto", "Prepararme para mi primer empleo"):
         usa.add("entrevistas")
-    usa.add("ruta_dm")   # la ruta de desarrollo aplica a todo colaborador de una empresa que la tenga habilitada
+    if ctx in ("Trabajo en una empresa", "Otra", ""):
+        usa.add("ruta_dm")   # la ruta de desarrollo aplica a colaboradores de una empresa que la tenga habilitada (no a negocio propio, estudios u hogar)
     return usa
+
+
+def es_contexto_empresa(onboarding: dict) -> bool:
+    return (onboarding or {}).get("contexto", "") in ("Trabajo en una empresa", "Otra", "")
+
+
+def habilidades_relevantes(onboarding: dict, diagnostico: dict | None, habs_empresa: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Qué escenarios le sirven a ESTA persona: los de su rol/contexto + los que Elena marcó con brecha alta o media. El resto queda como 'otras'.
+    Las habilidades personalizadas (Ruta DM) sólo si su empresa las tiene y su contexto es de empresa."""
+    usa = habilidades_que_usa(onboarding or {})
+    if es_contexto_empresa(onboarding or {}):
+        return list(habs_empresa), []   # colaboradores de empresa: la experiencia completa (todas las habilidades habilitadas), como hasta ahora
+    prior = {p.get("habilidad_id") for p in (diagnostico or {}).get("prioridades", []) if p.get("brecha") in ("alta", "media")}
+    relevantes, otras = [], []
+    for h in habs_empresa:
+        if h["id"] == "ruta_dm":
+            (relevantes if "ruta_dm" in usa else otras).append(h)
+        elif h["id"] in usa or h["id"] in prior:
+            relevantes.append(h)
+        else:
+            otras.append(h)
+    if not relevantes and habs_empresa:   # nunca dejamos a alguien sin escenario: el de menor barrera (ventas trata con personas)
+        relevantes.append(habs_empresa[0])
+        otras = [h for h in habs_empresa if h["id"] != relevantes[0]["id"]]
+    return relevantes, otras
 
 
 def nivel_dm_estimado(onboarding: dict) -> str:
     """Estimación previa (la confirma Elena en la entrevista)."""
+    if onboarding.get("contexto") in ("Tengo mi negocio u oficio", "Estudio", "Me dedico al hogar y la familia", "Estoy buscando empleo"):
+        return "DM Básico"
     lidera = onboarding.get("dm_lidera", "")
     trabajo = onboarding.get("dm_trabajo", "")
     if trabajo == "Crear empresas o nuevos modelos":

@@ -33,6 +33,13 @@
       <div class="field"><label>Objetivo que quieres trabajar (opcional)</label><input name="objetivo" placeholder="Ej. manejar la objeción de precio sin ceder"></div>
       {% endif %}
       {% if hab.id == 'ventas' %}<div class="field"><label>¿Qué vas a vender hoy? (opcional)</label><input name="producto" value="{{ perfil.onboarding.get('producto_concreto','') }}" placeholder="Ej. implementación de Odoo para una PYME de manufactura"></div>{% endif %}
+      {% if leccion %}{% set lc = leccion.contenido %}
+      <div class="card mb" style="background:var(--surface-2);border:1px solid var(--line)"><div class="row between"><div class="cap">Sócrates en 60 segundos</div><a class="small" href="/socrates/{{ leccion.id }}">ver la master class →</a></div>
+        <p class="small"><b>{{ lc.idea_central }}</b></p>
+        <ul class="list" style="margin:6px 0 0">{% for x in lc.checklist_practica[:4] %}<li><span class="n">☐</span><div class="small">{{ x }}</div></li>{% endfor %}</ul></div>
+      {% elif item and (u.modalidad or 'completa') == 'completa' %}
+      <div class="alert info mb">¿Quieres la teoría primero? <form method="post" action="/socrates/estudiar" style="display:inline"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="habilidad" value="{{ hab.id }}"><input type="hidden" name="tema" value="{{ tema_socrates }}"><input type="hidden" name="competencia" value="{{ item.competencia }}"><input type="hidden" name="item" value="{{ item.id }}"><button class="btn sm" type="submit">📘 Prepárate con Sócrates</button></form></div>
+      {% endif %}
       <div class="alert info mb">Durante la sesión el avatar no da retroalimentación: vive el escenario. Al terminar (o al escribir <b>Fin</b>) recibirás el análisis completo con evidencia.</div>
       <button class="btn primary lg block" type="submit">Entrar con {{ avatar.nombre.split(' ')[0] }}</button>
       {% if item %}<p class="center mt"><a class="small" href="/entrenar/{{ hab.id }}?item=0">Prefiero una práctica libre</a></p>{% endif %}

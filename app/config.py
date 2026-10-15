@@ -31,7 +31,7 @@ def _f(key: str, default: float) -> float:
 class Settings:
     APP_NAME = "Mente Viva"
     TAGLINE = "Crece desde adentro, impacta hacia afuera"
-    VERSION = "1.1.4"
+    VERSION = "1.3.0"
 
     def __init__(self) -> None:
         self.APP_ENV = os.getenv("APP_ENV", "development")
@@ -75,7 +75,22 @@ class Settings:
         self.GEMINI_TIMEOUT = _i("GEMINI_TIMEOUT", 90)
         # Modelos de respaldo si el principal está saturado (503/429): se prueban en orden
         self.GEMINI_FALLBACKS = [m.strip() for m in os.getenv("GEMINI_FALLBACKS", "gemini-3.7-flash,gemini-3.5-flash,gemini-3.5-flash-lite,gemini-2.5-flash").split(",") if m.strip()]
-        self.GROUNDING_MAX_MES = _i("GROUNDING_MAX_MES", 40)   # llamadas con búsqueda de Google al mes (tienen costo aparte)
+        self.GROUNDING_MAX_MES = _i("GROUNDING_MAX_MES", 150)  # llamadas con búsqueda de Google al mes (tienen costo aparte; Sócrates usa una por lección)
+        self.SOCRATES_MAX_MES = _i("SOCRATES_MAX_MES", 12)      # lecciones nuevas por persona al mes (releer no cuesta)
+
+        # ── Correo (notificaciones) y modalidad "Prepárate 5 minutos" ──────
+        self.SMTP_HOST = os.getenv("SMTP_HOST", "").strip()
+        self.SMTP_PORT = _i("SMTP_PORT", 587)
+        self.SMTP_USER = os.getenv("SMTP_USER", "").strip()
+        self.SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+        self.SMTP_FROM = os.getenv("SMTP_FROM", "").strip() or self.SMTP_USER
+        self.SMTP_SSL = _b("SMTP_SSL", False)                   # True para puerto 465 (SSL directo); False = STARTTLS en 587
+        self.EMAIL_ENABLED = _b("EMAIL_ENABLED", bool(self.SMTP_HOST and self.SMTP_USER))
+        self.MICRO_HORAS = [int(h) for h in os.getenv("MICRO_HORAS", "9,13,17").split(",") if h.strip().isdigit()]   # recordatorios "Prepárate 5 minutos"
+        self.MICRO_MINUTOS = _i("MICRO_MINUTOS", 5)
+        self.SOPORTE_NOMBRE = os.getenv("SOPORTE_NOMBRE", "Brandon Honorato")
+        self.SOPORTE_TEL = os.getenv("SOPORTE_TEL", "55 1952 1615")
+        self.SOPORTE_EMAIL = os.getenv("SOPORTE_EMAIL", "brandon.honorato@i-condor.com")
 
         # ── Presupuesto de IA (tope duro) ───────────────────────────────────
         self.PRESUPUESTO_MXN = _f("PRESUPUESTO_MXN", 500.0)

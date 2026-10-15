@@ -70,3 +70,11 @@ En tu computadora, con la misma key: `pip install -r requirements.txt` y `python
 - Al arrancar, la plataforma crea tablas **sólo si no existen** y el superadmin / empresa inicial **sólo si la base está vacía**; nunca sobreescribe contraseñas ni registros aunque cambien las variables de entorno. La prueba `tests/test_actualizacion.py` arranca una versión nueva sobre una base con datos y comprueba usuarios, contraseñas, sesiones y conteos.
 - Comprobación en producción: Admin → **Datos y respaldo** muestra la ruta de la base, si el disco es persistente, los conteos y la versión en ejecución; el log de arranque imprime lo mismo (`… 1 empresas · 12 usuarios activos · 40 sesiones · disco persistente`). Si dice **TEMPORAL**, falta el disco o `DATA_DIR`.
 - Antes de cada deploy: Admin → **Descargar respaldo (.db)**. Render además toma un snapshot diario del disco (7 días). Para restaurar, copia el archivo a `/data/mente_viva.db` con el servicio detenido (Render → Shell) y reinicia.
+
+
+## Correo (avisos por correo)
+
+1. Gmail/Google Workspace: activa verificación en dos pasos y crea una **contraseña de aplicación**; variables: `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_USER=tu@dominio.com`, `SMTP_PASSWORD=<contraseña de aplicación>`, `SMTP_FROM=tu@dominio.com`. Brevo/SendGrid: su host y puerto 587 con la API key como contraseña.
+2. Define `BASE_URL=https://tu-app.onrender.com` para que los botones del correo abran la plataforma.
+3. Admin → Plataforma → **Enviar prueba**. Si falla, el error exacto del servidor SMTP queda en la bitácora.
+4. Los recordatorios "Prepárate 5 minutos" salen a las `MICRO_HORAS` (zona `TZ`), lunes a viernes, sólo a quienes tengan esa modalidad y les falte el bloque.

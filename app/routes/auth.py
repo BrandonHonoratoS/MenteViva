@@ -83,6 +83,27 @@ def cuenta_password(request: Request, actual: str = Form(""), nueva: str = Form(
     return RedirectResponse(inicio_por_rol(u) if u.get("debe_cambiar_password") else "/cuenta?ok=1", status_code=303)
 
 
+@router.post("/cuenta/preferencias")
+def cuenta_preferencias(request: Request, csrf: str = Form(""), correo_notif: str = Form(""), modalidad: str = Form("")):
+    u = usuario_actual(request)
+    if not u:
+        return RedirectResponse("/login", status_code=307)
+    verificar_csrf(request, u, csrf)
+    campos = {"correo_notif": 1 if correo_notif == "1" else 0}
+    if modalidad in ("completa", "micro"):
+        campos["modalidad"] = modalidad
+    db.actualizar_usuario_prefs(u["id"], **campos)
+    return RedirectResponse("/cuenta?ok=2", status_code=303)
+
+
+@router.get("/ayuda")
+def ayuda(request: Request):
+    u = usuario_actual(request)
+    if not u:
+        return RedirectResponse("/login", status_code=307)
+    return render(request, "ayuda.html", u, soporte={"nombre": settings.SOPORTE_NOMBRE, "tel": settings.SOPORTE_TEL, "email": settings.SOPORTE_EMAIL})
+
+
 @router.get("/notificaciones")
 def notificaciones(request: Request, u: dict = Depends(requiere_usuario)):
     lista = db.notificaciones(u["id"], limite=80)

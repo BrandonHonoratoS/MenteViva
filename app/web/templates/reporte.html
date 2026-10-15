@@ -3,6 +3,7 @@
 {% block acciones %}<a class="btn sm" href="/sesion/{{ s.id }}/reporte.pdf">{{ m.icon('download') }} PDF</a>{% endblock %}
 {% block content %}
 {% set reco = res.recomendacion or res.siguiente_paso or {} %}
+{% if encuesta_pendiente %}<div class="alert info mb"><b>¿Cómo fue tu primera práctica?</b> Eres de las primeras personas en vivir Mente Viva: tu opinión nos ayuda a mejorar. <a href="/encuesta">Contar mi experiencia (3 min)</a></div>{% endif %}
 <div class="grid g-2-1">
   <div class="stack">
     {% if res.laboratorio %}{% include "_reporte_lab.html" %}{% else %}

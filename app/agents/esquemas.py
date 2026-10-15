@@ -134,6 +134,21 @@ ANALISTA_RESUMEN = _obj({"titulo": _s(), "resumen": _s(), "avanzan": _arr(_s(), 
 HALLAZGO = _obj({"hallazgo": _s(), "fuente": _s("dominio o título")})
 INVESTIGACION = _obj({"hallazgos": _arr(HALLAZGO, 1, 5), "aplicacion": _s(), "confianza": {"type": "string", "enum": ["alto", "medio", "bajo"]}, "confianza_motivo": _s()})
 
+# ── Sócrates: lección ────────────────────────────────────────────────────────
+MARCO = _obj({"nombre": _s(), "origen": _s("autor/obra/año u organismo"), "que_es": _s(), "como_aplicarlo": _s(), "ejemplo": _s("en el contexto de la persona")})
+PASO_LECCION = _obj({"nombre": _s(), "que_hacer": _s(), "frase_o_accion": _s(), "error_tipico": _s()})
+FILA_COMP = _obj({"situacion": _s(), "enfoque_debil": _s(), "enfoque_experto": _s()})
+ERROR_LECCION = _obj({"error": _s(), "por_que_ocurre": _s(), "alternativa": _s()})
+PREGUNTA_SOC = _obj({"pregunta": _s(), "pista": _s(), "respuesta_modelo": _s()})
+FUENTE_LECCION = _obj({"autor_u_organismo": _s(), "obra": _s(), "anio": _s(), "url": _s("vacío si no hay"), "para_que": _s()})
+LECCION = _obj({
+    "titulo": _s(), "gancho": _s(), "idea_central": _s(), "duracion_min": _i(5, 40),
+    "mapa_mermaid": _s("flowchart TD con nodos A[\"...\"] --> B[\"...\"]"),
+    "marcos": _arr(MARCO, 3, 5), "proceso": _arr(PASO_LECCION, 4, 7), "comparativa": _arr(FILA_COMP, 3, 5), "errores_comunes": _arr(ERROR_LECCION, 3, 5),
+    "caso": _obj({"titulo": _s(), "narrativa": _s(), "lectura": _s()}),
+    "preguntas_socraticas": _arr(PREGUNTA_SOC, 4, 6), "checklist_practica": _arr(_s(), 5, 7), "cierre": _s(), "fuentes": _arr(FUENTE_LECCION, 3, 8),
+})
+
 # ── roadmaps ─────────────────────────────────────────────────────────────────
 ITEM_RM = _obj({"semana": _i(1, 12), "nivel": _s(), "competencia": _s("sólo ruta_dm; vacío en otras"), "objetivo": _s("objetivo medible de la sesión"), "porque": _s("una línea")})
 AJUSTE_PLAN = _obj({"items": _arr(_obj({"n": _i(1, 16), "objetivo": _s("objetivo medible"), "porque": _s("una línea")}), 1, 16)})

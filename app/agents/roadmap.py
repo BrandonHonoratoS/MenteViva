@@ -47,12 +47,17 @@ def analizar_diagnostico(sesion: dict, usuario: dict, transcript: str) -> None:
     if "ruta_dm" in ids:
         db.guardar_nivel(usuario["id"], "ruta_dm", diag.get("nivel_dm") or C.nivel_dm_estimado(ob), None, "diagnóstico de Elena")
 
-    # roadmaps: uno por habilidad con brecha (según Elena) + la Ruta DM siempre que esté habilitada
-    prioridades = [p for p in diag.get("prioridades", []) if p.get("habilidad_id") in ids]
-    orden = [p["habilidad_id"] for p in prioridades]
-    if "ruta_dm" in ids and "ruta_dm" not in orden:
-        orden.append("ruta_dm")
+    # roadmaps: uno por habilidad que a la persona le sirve (su contexto/rol o brecha alta/media según Elena); la Ruta DM sólo para gente de empresa
     usa = C.habilidades_que_usa(ob)
+    relevantes = {h["id"] for h in C.habilidades_relevantes(ob, diag, habs)[0]}
+    prioridades = [p for p in diag.get("prioridades", []) if p.get("habilidad_id") in ids and p["habilidad_id"] in relevantes]
+    orden = [p["habilidad_id"] for p in prioridades]
+    if "ruta_dm" in relevantes and "ruta_dm" not in orden:
+        orden.append("ruta_dm")
+    if not C.es_contexto_empresa(ob):   # público general: las habilidades de su vida real llevan plan aunque Elena no las listara
+        for hid in relevantes:
+            if hid not in orden:
+                orden.append(hid)
     spw_total = C.sesiones_por_semana(ob.get("tiempo_semana", ""))
     creados = []
     for i, hid in enumerate(orden):
@@ -77,13 +82,19 @@ def generar_roadmaps_faltantes(usuario: dict) -> list[str]:
     if perfil.get("estado") != "completo" or not diag:
         return []
     ob = perfil.get("onboarding", {})
-    ids = {h["id"] for h in C.habilidades_empresa(db.empresa(usuario.get("empresa_id")))}
-    prioridades = [p for p in diag.get("prioridades", []) if p.get("habilidad_id") in ids]
-    orden = [p["habilidad_id"] for p in prioridades]
-    if "ruta_dm" in ids and "ruta_dm" not in orden:
-        orden.append("ruta_dm")
-    existentes = {r["habilidad"] for r in db.roadmaps(usuario["id"], ("activo", "propuesto"))}
+    habs = C.habilidades_empresa(db.empresa(usuario.get("empresa_id")))
+    ids = {h["id"] for h in habs}
     usa = C.habilidades_que_usa(ob)
+    relevantes = {h["id"] for h in C.habilidades_relevantes(ob, diag, habs)[0]}
+    prioridades = [p for p in diag.get("prioridades", []) if p.get("habilidad_id") in ids and p["habilidad_id"] in relevantes]
+    orden = [p["habilidad_id"] for p in prioridades]
+    if "ruta_dm" in relevantes and "ruta_dm" not in orden:
+        orden.append("ruta_dm")
+    if not C.es_contexto_empresa(ob):
+        for hid in relevantes:
+            if hid not in orden:
+                orden.append(hid)
+    existentes = {r["habilidad"] for r in db.roadmaps(usuario["id"], ("activo", "propuesto"))}
     spw_total = C.sesiones_por_semana(ob.get("tiempo_semana", ""))
     creados = []
     for i, hid in enumerate(orden):

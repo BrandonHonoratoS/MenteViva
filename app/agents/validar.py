@@ -186,6 +186,41 @@ def feedback_laboratorio(js: dict | None, sesion: dict) -> dict:
     }
 
 
+def leccion(js: dict | None, tema: str, fuentes_web: list[dict] | None = None) -> dict:
+    """Lección de Sócrates: estructura completa y coherente aunque la IA omita secciones; el diagrama se sanea para Mermaid."""
+    import re
+    js = js if isinstance(js, dict) else {}
+    mapa = _texto(js.get("mapa_mermaid"))
+    mapa = re.sub(r"^```(?:mermaid)?\s*|\s*```$", "", mapa.strip(), flags=re.M).strip()
+    if mapa and not re.match(r"^(flowchart|graph)\s+(TD|LR|TB|RL|BT)", mapa):
+        mapa = "flowchart TD\n" + mapa
+    mapa = re.sub(r"%%.*", "", mapa)[:4000].strip()
+    urls_ok = {f.get("url") for f in (fuentes_web or []) if f.get("url")}
+    fuentes = []
+    for f in _lista(js.get("fuentes"))[:8]:
+        if not isinstance(f, dict):
+            continue
+        url = _texto(f.get("url"))
+        fuentes.append({"autor_u_organismo": _texto(f.get("autor_u_organismo"), "—"), "obra": _texto(f.get("obra"), "—"), "anio": _texto(f.get("anio"), "s.f."),
+                        "url": url if (url in urls_ok or url.startswith("http")) else "", "para_que": _texto(f.get("para_que"))})
+    for f in (fuentes_web or [])[:6]:
+        if f.get("url") and not any(x["url"] == f["url"] for x in fuentes):
+            fuentes.append({"autor_u_organismo": f.get("dominio") or "web", "obra": f.get("titulo") or f.get("dominio") or "", "anio": "s.f.", "url": f["url"], "para_que": "Fuente consultada en la investigación."})
+    caso = js.get("caso") if isinstance(js.get("caso"), dict) else {}
+    return {
+        "titulo": _texto(js.get("titulo"), tema)[:140], "gancho": _texto(js.get("gancho")), "idea_central": _texto(js.get("idea_central")),
+        "duracion_min": int(_num(js.get("duracion_min"), 5, 40, default=15)), "mapa_mermaid": mapa,
+        "marcos": _items(js.get("marcos"), {"nombre": "Marco", "origen": "", "que_es": "", "como_aplicarlo": "", "ejemplo": ""}, 5),
+        "proceso": _items(js.get("proceso"), {"nombre": "Paso", "que_hacer": "", "frase_o_accion": "", "error_tipico": ""}, 7),
+        "comparativa": _items(js.get("comparativa"), {"situacion": "", "enfoque_debil": "", "enfoque_experto": ""}, 5),
+        "errores_comunes": _items(js.get("errores_comunes"), {"error": "", "por_que_ocurre": "", "alternativa": ""}, 5),
+        "caso": {"titulo": _texto(caso.get("titulo"), "Caso"), "narrativa": _texto(caso.get("narrativa")), "lectura": _texto(caso.get("lectura"))},
+        "preguntas_socraticas": _items(js.get("preguntas_socraticas"), {"pregunta": "", "pista": "", "respuesta_modelo": ""}, 6),
+        "checklist_practica": [str(x) for x in _lista(js.get("checklist_practica")) if str(x).strip()][:7],
+        "cierre": _texto(js.get("cierre")), "fuentes": fuentes,
+    }
+
+
 def _radar_por_pct(p: float) -> str:
     return "Fortalecido" if p >= 0.9 else "Sólido" if p >= 0.75 else "En desarrollo" if p >= 0.6 else "Requiere atención"
 

@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% block title %}Metodología y estándares{% endblock %}
+{% block subtitulo %}{{ empresa.nombre }} · cómo quiere esta empresa que se entrene y se evalúe cada habilidad{% endblock %}
+{% block content %}
+{% if ok %}<div class="alert ok mb">Estándares guardados. Los agentes y Sócrates los usan desde la siguiente sesión o lección; las lecciones ya generadas no cambian.</div>{% endif %}
+<div class="alert info mb">Si dejas un campo vacío se usa el estándar de Mente Viva (el que hoy usa Ingeniería Cóndor). Escribe en lenguaje natural: metodología, etapas, términos propios, lo que no debe exigirse. Los avatares entrenan y evalúan con lo que escribas aquí; Sócrates enseña tu metodología antes que la genérica.</div>
+<form method="post" action="{{ accion }}" class="stack">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="card"><h2>Estilo general de la empresa</h2><p class="muted small">Aplica a todas las habilidades: cómo se comunica, cómo se presentan las cosas, qué valores deben notarse.</p>
+    {% for k, etiqueta, ph in campos_general %}<div class="field"><label>{{ etiqueta }}</label><textarea name="general.{{ k }}" rows="3" placeholder="{{ ph }}">{{ est.get('general', {}).get(k, '') }}</textarea></div>{% endfor %}
+  </div>
+  {% for h in habilidades %}
+  <div class="card"><h2>{{ h.nombre }}</h2><p class="muted small">Estándar de Mente Viva si no escribes nada: {{ defaults.get(h.id, '—') }}</p>
+    {% for k, etiqueta, ph in campos_habilidad %}<div class="field"><label>{{ etiqueta }}</label><textarea name="{{ h.id }}.{{ k }}" rows="3" placeholder="{{ ph }}">{{ est.get(h.id, {}).get(k, '') }}</textarea></div>{% endfor %}
+  </div>
+  {% endfor %}
+  {% if ruta_dm %}<div class="card"><h2>Ruta Delivery Manager</h2><p class="muted small">Es la metodología propia de Ingeniería Cóndor (niveles, competencias y laboratorio) y no se sustituye; el estilo general de arriba sí se toma en cuenta en las sesiones con Juan.</p></div>{% endif %}
+  <div class="card"><button class="btn primary lg block" type="submit">Guardar estándares</button></div>
+</form>
+{% endblock %}

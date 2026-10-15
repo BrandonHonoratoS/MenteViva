@@ -220,3 +220,25 @@ details summary{cursor:pointer;font-weight:700;color:var(--violet)}
 @media(max-width:760px){.shell{flex-direction:column}.sidebar{width:100%;height:auto;position:relative;flex-direction:row;flex-wrap:wrap;padding:12px}.sidebar .foot,.brand small{display:none}
   .nav{display:flex;gap:4px;flex-wrap:wrap}.nav a{padding:8px 10px;font-size:.82rem}.main{padding:16px}.g2,.g3,.g4{grid-template-columns:1fr}.login{grid-template-columns:1fr}.login .art{display:none}.msg{max-width:92%}
   .topbar{flex-wrap:wrap}.kpi-row{grid-template-columns:1fr}.card.hero .row{flex-direction:column;align-items:flex-start}.card.hero .row>div:not(.orb):not(.orb-wrap){min-width:0!important;width:100%;max-width:100%}.orb{width:84px;height:84px;flex:none}body{overflow-x:hidden}.main,.card{min-width:0;max-width:100%}h2{overflow-wrap:anywhere}.score-big{font-size:2.4rem}.card{padding:16px}}
+
+/* Sócrates */
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 14px}
+.tabs button{border:1px solid var(--line);background:#fff;border-radius:99px;padding:8px 14px;font-weight:600;color:var(--muted);cursor:pointer}
+.tabs button.on{background:var(--grad);color:#fff;border-color:transparent}
+.tab-pane>.card{margin-bottom:18px}
+.mermaid-box{overflow:auto;padding:8px;border-radius:14px;background:var(--surface-2)}
+.mermaid-box svg{max-width:100%;height:auto}
+details.marco{padding:10px 12px;border:1px solid var(--line);border-radius:14px;margin-bottom:10px}
+details.marco summary{cursor:pointer}
+.chip.tiny{font-size:.65rem;padding:2px 7px}
+.racha{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:99px;background:linear-gradient(135deg,#FFF7ED,#FEF3C7);color:#B45309;font-weight:700}
+
+/* encuesta */
+.chips-radio{display:flex;flex-wrap:wrap;gap:6px}
+.chip-opt{position:relative;cursor:pointer;margin:0}
+.chip-opt input{position:absolute;opacity:0;width:0;height:0}
+.chip-opt span{display:inline-block;padding:7px 12px;border-radius:99px;border:1px solid var(--line);background:#fff;font-size:.85rem;font-weight:600;color:var(--muted)}
+.chip-opt.num span{min-width:38px;text-align:center;padding:7px 8px}
+.chip-opt input:checked+span{background:var(--grad);color:#fff;border-color:transparent}
+.field.falta label{color:#BE123C}
+.field.falta .chip-opt span,.field.falta textarea,.field.falta input{border-color:#F43F5E}

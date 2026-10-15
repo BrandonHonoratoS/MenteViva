@@ -259,6 +259,56 @@ CREATE TABLE IF NOT EXISTS uso_llm (
 );
 CREATE INDEX IF NOT EXISTS ix_uso_periodo ON uso_llm(periodo);
 CREATE TABLE IF NOT EXISTS ajustes (clave TEXT PRIMARY KEY, valor TEXT NOT NULL, actualizado_en TEXT);
+CREATE TABLE IF NOT EXISTS actividad (
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
+    fecha TEXT NOT NULL,                     -- YYYY-MM-DD (zona horaria de la plataforma)
+    minutos INTEGER DEFAULT 0,
+    bloques INTEGER DEFAULT 0,               -- bloques de "Prepárate 5 minutos" completados
+    turnos INTEGER DEFAULT 0,
+    PRIMARY KEY (usuario_id, fecha)
+);
+CREATE TABLE IF NOT EXISTS lecciones (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
+    habilidad TEXT NOT NULL,
+    competencia TEXT DEFAULT '',
+    tema TEXT NOT NULL,                      -- título del tema (p. ej. "Manejo de objeciones" o "Gestión de conflictos")
+    clave TEXT NOT NULL,                     -- usuario:habilidad:tema normalizado (una lección personalizada por tema)
+    roadmap_item_id INTEGER,
+    estado TEXT NOT NULL DEFAULT 'generando', -- generando | lista | error
+    titulo TEXT DEFAULT '',
+    contenido_json TEXT DEFAULT '{}',
+    fuentes_json TEXT DEFAULT '[]',
+    error TEXT DEFAULT '',
+    version INTEGER DEFAULT 1,
+    creado_en TEXT NOT NULL,
+    lista_en TEXT,
+    leida_en TEXT,
+    costo_usd REAL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS ix_lecciones_usuario ON lecciones(usuario_id, habilidad);
+CREATE TABLE IF NOT EXISTS lecciones_base (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    clave TEXT NOT NULL UNIQUE,              -- habilidad|tema|nivel|perfil (p. ej. ventas|Manejo de objeciones|Intermedio|vende:Software / SaaS)
+    habilidad TEXT NOT NULL,
+    tema TEXT NOT NULL,
+    nivel TEXT DEFAULT '',
+    perfil TEXT DEFAULT '',
+    contenido_json TEXT DEFAULT '{}',
+    fuentes_json TEXT DEFAULT '[]',
+    dossier TEXT DEFAULT '',
+    usos INTEGER DEFAULT 0,
+    creado_en TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS encuestas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
+    empresa_id INTEGER,
+    sesion_id INTEGER,
+    tipo TEXT NOT NULL DEFAULT 'primera_experiencia',
+    respuestas_json TEXT DEFAULT '{}',
+    creado_en TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS bitacora (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     momento TEXT NOT NULL,
@@ -340,6 +390,7 @@ def init_db() -> None:
     """Crea el esquema, el superadministrador y (si se configuró) la empresa inicial."""
     with _LOCK, conn() as con:
         con.executescript(SCHEMA)
+        _migrar(con)
         if con.execute("SELECT COUNT(*) c FROM usuarios WHERE rol='superadmin'").fetchone()["c"] == 0:
             crear_usuario(settings.SUPERADMIN_EMAIL, settings.SUPERADMIN_PASSWORD, settings.SUPERADMIN_NOMBRE,
                           "superadmin", empresa_id=None, debe_cambiar=False, _con=con)
@@ -392,6 +443,21 @@ def respaldo_bytes() -> bytes:
             os.remove(tmp)
         except OSError:
             pass
+
+
+# Columnas agregadas en versiones posteriores (ALTER TABLE sólo si faltan: nunca se pierden datos)
+MIGRACIONES = [
+    ("usuarios", "modalidad", "TEXT DEFAULT 'completa'"),          # completa | micro ("Prepárate 5 minutos")
+    ("usuarios", "modalidad_fijada_por", "TEXT DEFAULT ''"),       # '' (la persona elige) | rrhh
+    ("usuarios", "correo_notif", "INTEGER DEFAULT 1"),              # recibir avisos por correo
+]
+
+
+def _migrar(con: sqlite3.Connection) -> None:
+    for tabla, columna, tipo in MIGRACIONES:
+        cols = {r["name"] for r in con.execute(f"PRAGMA table_info({tabla})")}
+        if columna not in cols:
+            con.execute(f"ALTER TABLE {tabla} ADD COLUMN {columna} {tipo}")
 
 
 # ── usuarios y autenticación ─────────────────────────────────────────────────
@@ -944,10 +1010,71 @@ def analisis(empresa_id: int, tipo: str | None = None, usuario_id: int | None = 
         return _rows(con.execute(q, args))
 
 
+NOTIF_HOOKS: list = []   # funciones (usuario_id, titulo, cuerpo, enlace, tipo) que se ejecutan al crear un aviso (p. ej. envío por correo)
+
+
 def notificar(usuario_id: int, titulo: str, cuerpo: str = "", enlace: str = "", tipo: str = "info") -> None:
     with conn() as con:
         con.execute("INSERT INTO notificaciones (usuario_id, titulo, cuerpo, enlace, tipo, creado_en) VALUES (?,?,?,?,?,?)",
                     (usuario_id, titulo, cuerpo, enlace, tipo, now()))
+    for h in NOTIF_HOOKS:
+        try:
+            h(usuario_id, titulo, cuerpo, enlace, tipo)
+        except Exception:  # noqa: BLE001 — un aviso nunca debe fallar por el correo
+            pass
+
+
+# ── actividad diaria y racha ("Prepárate 5 minutos") ───────────────────────
+def fecha_local_hoy() -> str:
+    from zoneinfo import ZoneInfo
+    return datetime.now(ZoneInfo(settings.TZ)).strftime("%Y-%m-%d")
+
+
+def registrar_actividad(usuario_id: int, minutos: int = 0, turnos: int = 0, bloques: int = 0) -> None:
+    hoy = fecha_local_hoy()
+    with conn() as con:
+        con.execute("INSERT INTO actividad (usuario_id, fecha, minutos, turnos, bloques) VALUES (?,?,?,?,?) "
+                    "ON CONFLICT(usuario_id, fecha) DO UPDATE SET minutos=minutos+excluded.minutos, turnos=turnos+excluded.turnos, bloques=bloques+excluded.bloques",
+                    (usuario_id, hoy, minutos, turnos, bloques))
+
+
+def actividad_hoy(usuario_id: int) -> dict:
+    with conn() as con:
+        r = _row(con.execute("SELECT * FROM actividad WHERE usuario_id=? AND fecha=?", (usuario_id, fecha_local_hoy())).fetchone())
+    return r or {"usuario_id": usuario_id, "fecha": fecha_local_hoy(), "minutos": 0, "turnos": 0, "bloques": 0}
+
+
+def racha_dias(usuario_id: int) -> dict:
+    """Días consecutivos con actividad (termina hoy o ayer). Un día cuenta si hubo al menos un turno o un bloque de 5 minutos."""
+    from datetime import date
+    with conn() as con:
+        fechas = {r["fecha"] for r in con.execute("SELECT fecha FROM actividad WHERE usuario_id=? AND (turnos>0 OR bloques>0 OR minutos>=5) ORDER BY fecha DESC LIMIT 400", (usuario_id,))}
+    hoy = date.fromisoformat(fecha_local_hoy())
+    d = hoy if hoy.isoformat() in fechas else hoy - timedelta(days=1)
+    n = 0
+    while d.isoformat() in fechas:
+        n += 1
+        d -= timedelta(days=1)
+    return {"dias": n, "hoy": hoy.isoformat() in fechas, "mejor": _mejor_racha(sorted(fechas))}
+
+
+def _mejor_racha(fechas: list[str]) -> int:
+    from datetime import date
+    mejor, actual, prev = 0, 0, None
+    for f in fechas:
+        d = date.fromisoformat(f)
+        actual = actual + 1 if prev and (d - prev).days == 1 else 1
+        mejor = max(mejor, actual)
+        prev = d
+    return mejor
+
+
+def actualizar_usuario_prefs(usuario_id: int, **campos) -> None:
+    permitidos = {"modalidad", "modalidad_fijada_por", "correo_notif"}
+    campos = {k: v for k, v in campos.items() if k in permitidos}
+    if campos:
+        with conn() as con:
+            con.execute(f"UPDATE usuarios SET {', '.join(f'{k}=?' for k in campos)} WHERE id=?", (*campos.values(), usuario_id))
 
 
 def notificaciones(usuario_id: int, solo_no_leidas: bool = False, limite: int = 50) -> list[dict]:
@@ -986,6 +1113,99 @@ def borrar_chat(usuario_id: int, ambito: str) -> None:
         for r in con.execute("SELECT id FROM chats WHERE usuario_id=? AND ambito=?", (usuario_id, ambito)):
             con.execute("DELETE FROM chat_mensajes WHERE chat_id=?", (r["id"],))
             con.execute("DELETE FROM chats WHERE id=?", (r["id"],))
+
+
+# ── Sócrates: lecciones ──────────────────────────────────────────────────────
+def _clave_leccion(usuario_id: int, habilidad: str, tema: str) -> str:
+    import unicodedata
+    base = unicodedata.normalize("NFKD", tema.strip().lower()).encode("ascii", "ignore").decode()
+    return f"{usuario_id}:{habilidad}:{'-'.join(base.split())[:80]}"
+
+
+def leccion(id_: int) -> dict | None:
+    with conn() as con:
+        return _row(con.execute("SELECT l.*, u.nombre AS usuario_nombre, u.empresa_id FROM lecciones l JOIN usuarios u ON u.id=l.usuario_id WHERE l.id=?", (id_,)).fetchone())
+
+
+def leccion_por_tema(usuario_id: int, habilidad: str, tema: str) -> dict | None:
+    with conn() as con:
+        return _row(con.execute("SELECT * FROM lecciones WHERE clave=? ORDER BY id DESC LIMIT 1", (_clave_leccion(usuario_id, habilidad, tema),)).fetchone())
+
+
+def lecciones(usuario_id: int, habilidad: str | None = None, limite: int = 100) -> list[dict]:
+    q, args = "SELECT * FROM lecciones WHERE usuario_id=?", [usuario_id]
+    if habilidad:
+        q += " AND habilidad=?"; args.append(habilidad)
+    q += " ORDER BY id DESC LIMIT ?"; args.append(limite)
+    with conn() as con:
+        return _rows(con.execute(q, args))
+
+
+def crear_leccion(usuario_id: int, habilidad: str, tema: str, competencia: str = "", roadmap_item_id: int | None = None) -> int:
+    with conn() as con:
+        return con.execute("INSERT INTO lecciones (usuario_id, habilidad, competencia, tema, clave, roadmap_item_id, creado_en) VALUES (?,?,?,?,?,?,?)",
+                           (usuario_id, habilidad, competencia, tema.strip()[:120], _clave_leccion(usuario_id, habilidad, tema), roadmap_item_id, now())).lastrowid
+
+
+def actualizar_leccion(id_: int, **campos) -> None:
+    permitidos = {"estado", "titulo", "contenido_json", "fuentes_json", "error", "version", "lista_en", "leida_en", "costo_usd", "roadmap_item_id"}
+    campos = {k: (_j(v) if k.endswith("_json") and not isinstance(v, str) else v) for k, v in campos.items() if k in permitidos}
+    if campos:
+        with conn() as con:
+            con.execute(f"UPDATE lecciones SET {', '.join(f'{k}=?' for k in campos)} WHERE id=?", (*campos.values(), id_))
+
+
+def leccion_base(clave: str) -> dict | None:
+    with conn() as con:
+        return _row(con.execute("SELECT * FROM lecciones_base WHERE clave=?", (clave,)).fetchone())
+
+
+def guardar_leccion_base(clave: str, habilidad: str, tema: str, nivel: str, perfil: str, contenido: dict, fuentes: list, dossier: str) -> None:
+    with conn() as con:
+        con.execute("INSERT INTO lecciones_base (clave, habilidad, tema, nivel, perfil, contenido_json, fuentes_json, dossier, creado_en) VALUES (?,?,?,?,?,?,?,?,?) "
+                    "ON CONFLICT(clave) DO UPDATE SET contenido_json=excluded.contenido_json, fuentes_json=excluded.fuentes_json, dossier=excluded.dossier",
+                    (clave, habilidad, tema, nivel, perfil, _j(contenido), _j(fuentes), dossier, now()))
+
+
+def usar_leccion_base(clave: str) -> None:
+    with conn() as con:
+        con.execute("UPDATE lecciones_base SET usos=usos+1 WHERE clave=?", (clave,))
+
+
+def lecciones_mes(usuario_id: int) -> int:
+    with conn() as con:
+        return con.execute("SELECT COUNT(*) c FROM lecciones WHERE usuario_id=? AND creado_en>=? AND estado!='error'", (usuario_id, periodo() + "-01")).fetchone()["c"]
+
+
+# ── encuestas de experiencia ─────────────────────────────────────────────────
+def guardar_encuesta(usuario_id: int, empresa_id: int | None, respuestas: dict, tipo: str = "primera_experiencia", sesion_id: int | None = None) -> int:
+    with conn() as con:
+        return con.execute("INSERT INTO encuestas (usuario_id, empresa_id, sesion_id, tipo, respuestas_json, creado_en) VALUES (?,?,?,?,?,?)",
+                           (usuario_id, empresa_id, sesion_id, tipo, _j(respuestas), now())).lastrowid
+
+
+def encuesta_de(usuario_id: int, tipo: str = "primera_experiencia") -> dict | None:
+    with conn() as con:
+        return _row(con.execute("SELECT * FROM encuestas WHERE usuario_id=? AND tipo=? ORDER BY id DESC LIMIT 1", (usuario_id, tipo)).fetchone())
+
+
+def encuestas(empresa_id: int | None = None, tipo: str = "primera_experiencia", limite: int = 1000) -> list[dict]:
+    q = ("SELECT e.*, u.nombre AS usuario_nombre, u.email, u.puesto, u.rol, a.nombre AS area_nombre, em.nombre AS empresa_nombre FROM encuestas e "
+         "JOIN usuarios u ON u.id=e.usuario_id LEFT JOIN areas a ON a.id=u.area_id LEFT JOIN empresas em ON em.id=e.empresa_id WHERE e.tipo=?")
+    args: list = [tipo]
+    if empresa_id is not None:
+        q += " AND e.empresa_id=?"; args.append(empresa_id)
+    q += " ORDER BY e.id DESC LIMIT ?"; args.append(limite)
+    with conn() as con:
+        return _rows(con.execute(q, args))
+
+
+def pendiente_encuesta(usuario_id: int) -> dict | None:
+    """Primera práctica completada (cualquier avatar) sin encuesta todavía → sesión que la dispara."""
+    if encuesta_de(usuario_id):
+        return None
+    with conn() as con:
+        return _row(con.execute("SELECT * FROM sesiones WHERE usuario_id=? AND estado='completada' AND tipo IN ('practica','laboratorio') ORDER BY id LIMIT 1", (usuario_id,)).fetchone())
 
 
 # ── uso de IA y presupuesto ──────────────────────────────────────────────────

@@ -160,6 +160,45 @@ async def analista_chat(request: Request, u: dict = Depends(requiere_usuario)):
         raise HTTPException(503, str(e))
 
 
+@router.post("/socrates/{lid}/chat")
+async def socrates_chat(lid: int, request: Request, u: dict = Depends(requiere_usuario)):
+    body = await _json(request)
+    verificar_csrf(request, u, body.get("csrf"))
+    lec = db.leccion(lid)
+    if not lec or lec["usuario_id"] != u["id"]:
+        raise HTTPException(404, "Lección no encontrada")
+    if lec["estado"] != "lista":
+        raise HTTPException(409, "La lección todavía no está lista.")
+    texto = str(body.get("texto", "")).strip()[:2000]
+    if not texto:
+        raise HTTPException(400, "Escribe tu duda.")
+    from ..agents import socrates as S
+    try:
+        return S.chat(db.usuario(u["id"]), lec, texto)
+    except PresupuestoAgotado as e:
+        raise HTTPException(402, str(e))
+    except ErrorLLM as e:
+        raise HTTPException(503, str(e))
+
+
+@router.post("/actividad/bloque")
+async def actividad_bloque(request: Request, u: dict = Depends(requiere_usuario)):
+    """La pantalla de sesión/lección avisa cuando se completó un bloque de 5 minutos (modalidad "Prepárate 5 minutos")."""
+    body = await _json(request)
+    verificar_csrf(request, u, body.get("csrf"))
+    db.registrar_actividad(u["id"], minutos=settings.MICRO_MINUTOS, bloques=1)
+    r = db.racha_dias(u["id"])
+    return {"ok": True, "racha": r["dias"], "bloques_hoy": db.actividad_hoy(u["id"])["bloques"]}
+
+
+@router.get("/socrates/{lid}/estado")
+def socrates_estado(lid: int, u: dict = Depends(requiere_usuario)):
+    lec = db.leccion(lid)
+    if not lec or lec["usuario_id"] != u["id"]:
+        raise HTTPException(404, "Lección no encontrada")
+    return {"estado": lec["estado"], "error": lec.get("error") or ""}
+
+
 @router.post("/analista/chat/limpiar")
 async def analista_limpiar(request: Request, u: dict = Depends(requiere_usuario)):
     body = await _json(request)

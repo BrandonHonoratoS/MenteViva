@@ -47,3 +47,10 @@ def sesiones_xlsx(u: dict = Depends(requiere_rol("rrhh", "dg", "director"))):
     ss = [s for s in db.sesiones(empresa_id=u["empresa_id"], area_id=area_id, estado="completada", limite=5000) if s["tipo"] == "practica"]
     return Response(excel.sesiones(ss), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers={"Content-Disposition": 'attachment; filename="menteviva_sesiones.xlsx"'})
+
+
+@router.get("/exportar/encuestas.xlsx")
+def encuestas_xlsx(u: dict = Depends(requiere_rol("rrhh"))):
+    datos = excel.encuestas(db.encuestas(u["empresa_id"]), incluir_precio=False)
+    return Response(datos, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": 'attachment; filename="menteviva_encuestas.xlsx"'})

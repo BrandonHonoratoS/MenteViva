@@ -299,6 +299,7 @@ def turno(sesion: dict, usuario: dict, texto: str) -> dict:
         if not texto:
             raise ValueError("Escribe algo para continuar.")
         db.guardar_mensaje(sesion["id"], "usuario", texto)
+        db.registrar_actividad(usuario["id"], minutos=1, turnos=1)
         sesion = db.sesion(sesion["id"])
         perfil = db.perfil(usuario["id"])
         if sesion["tipo"] == "laboratorio":

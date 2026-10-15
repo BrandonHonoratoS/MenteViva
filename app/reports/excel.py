@@ -56,3 +56,18 @@ def sesiones(lista: list[dict]) -> bytes:
     buf = BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
+
+def encuestas(lista: list[dict], incluir_precio: bool) -> bytes:
+    from .. import encuesta as ENC
+    cols = ENC.columnas(incluir_precio)
+    wb = Workbook()
+    filas = []
+    for e in lista:
+        a = e.get("respuestas") or {}
+        filas.append([e["creado_en"][:16].replace("T", " "), e.get("usuario_nombre"), e.get("email"), e.get("puesto"), e.get("area_nombre"), e.get("empresa_nombre")]
+                     + [", ".join(a.get(pid)) if isinstance(a.get(pid), list) else a.get(pid, "") for pid, _ in cols])
+    _hoja(wb, "Encuestas", ["Fecha", "Persona", "Correo", "Puesto", "Área", "Empresa"] + [txt for _, txt in cols], filas, primera=True)
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()

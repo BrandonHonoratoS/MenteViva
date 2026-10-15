@@ -1,0 +1,35 @@
+{% extends "base.html" %}{% block title %}Tu experiencia{% endblock %}
+{% block subtitulo %}Eres de las primeras personas en vivir Mente Viva: tu opinión define lo que construimos (3–4 minutos){% endblock %}
+{% block content %}
+{% if hecha %}
+<div class="card hero"><h2>¡Gracias, {{ u.nombre.split(' ')[0] }}!</h2><p class="muted">Ya registramos tu experiencia. Si quieres agregar algo más, escríbele al equipo desde el botón de Ayuda.</p><a class="btn primary mt" href="/hoy">Volver a Hoy</a></div>
+{% else %}
+{% if faltan %}<div class="alert err mb">Faltan respuestas en: {{ faltan|length }} pregunta{{ 's' if faltan|length != 1 }} (marcadas en rojo).</div>{% endif %}
+<form method="post" action="/encuesta" class="stack">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {% for s in secciones %}
+  <div class="card">
+    <h2>{{ loop.index }}. {{ s.titulo }}</h2>
+    {% if s.precio %}<p class="muted small">Esta sección la lee sólo el equipo de Mente Viva (no tu empresa). Responde con total franqueza.</p>{% endif %}
+    {% for p in s.preguntas %}{% set v = previo.get(p.id) %}
+    <div class="field {{ 'falta' if p.id in faltan }}" style="margin-top:14px">
+      <label>{{ p.texto }}{% if p.opcional %} <span class="muted tiny">(opcional)</span>{% endif %}</label>
+      {% if p.tipo == 'opcion' %}
+      <div class="chips-radio">{% for o in p.opciones %}<label class="chip-opt"><input type="radio" name="{{ p.id }}" value="{{ o }}" {{ 'checked' if v == o }}><span>{{ o }}</span></label>{% endfor %}</div>
+      {% elif p.tipo == 'multiple' %}
+      <div class="chips-radio">{% for o in p.opciones %}<label class="chip-opt"><input type="checkbox" name="{{ p.id }}" value="{{ o }}" {{ 'checked' if v and o in v }}><span>{{ o }}</span></label>{% endfor %}</div>
+      {% elif p.tipo == 'escala' %}
+      <div class="chips-radio">{% for n in range(p.min, p.max + 1) %}<label class="chip-opt num"><input type="radio" name="{{ p.id }}" value="{{ n }}" {{ 'checked' if v == n }}><span>{{ n }}</span></label>{% endfor %}</div>
+      {% elif p.tipo == 'numero' %}
+      <div class="row"><input name="{{ p.id }}" type="number" min="0" step="1" value="{{ v }}" placeholder="0" style="max-width:200px"><span class="muted small">{{ p.sufijo }}</span></div>
+      {% else %}
+      <textarea name="{{ p.id }}" rows="3" placeholder="Escribe aquí…">{{ v or '' }}</textarea>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+  <div class="card"><button class="btn primary lg block" type="submit">Enviar mi experiencia</button><p class="muted tiny center mt">Tus respuestas se usan para mejorar Mente Viva. La sección de precio no es visible para tu empresa.</p></div>
+</form>
+{% endif %}
+{% endblock %}

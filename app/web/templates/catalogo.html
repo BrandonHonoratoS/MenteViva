@@ -15,6 +15,15 @@
 </div>
 {% endfor %}
 </div>
+{% if otras %}
+<details class="mt"><summary class="muted small">Otras habilidades disponibles en tu empresa que hoy no están en tu plan ({{ otras|length }}) — Elena no las priorizó para tu situación; puedes practicarlas libremente.</summary>
+<div class="grid g3 mt">
+{% for h in otras %}{% set av = AVATARES[h.agente] %}{% set cat = (CATEGORIAS|selectattr('id','equalto',h.categoria)|list)[0] %}
+<div class="cat"><div class="ico" style="background:{{ cat.color }}18">{{ cat.icono }}</div><div style="flex:1"><b>{{ h.nombre }}</b><div class="muted small">{{ cat.nombre }} · con {{ av.nombre }}</div>
+  <div class="row between mt"><span>{{ m.nivel_badge(niveles, h.id) }}</span>{% if perfil.estado == 'completo' and not en_curso %}<a class="btn sm" href="/entrenar/{{ h.id }}">Práctica libre</a>{% endif %}</div></div></div>
+{% endfor %}
+</div></details>
+{% endif %}
 <div class="section-title"><h2>Próximamente más habilidades</h2><span class="muted small">{{ proximamente|length }} categorías · {{ proximamente|sum(attribute='escenarios') }} escenarios en diseño</span></div>
 <div class="grid g3">
 {% for c in proximamente %}<div class="cat soon"><div class="ico" style="background:{{ c.color }}18">{{ c.icono }}</div><div><b>{{ c.nombre }}</b><div class="muted small">{{ c.escenarios }} escenarios · 3 niveles</div><span class="chip gris mt">Próximamente</span></div></div>{% endfor %}

@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import db, scheduler
 from .config import settings
-from .routes import admin, api, auth, colaborador, exportes, gestion, tableros
+from .routes import admin, api, auth, colaborador, exportes, gestion, socrates, tableros
 from .security import COOKIE, usuario_actual
 from .web import render
 
@@ -22,6 +22,8 @@ log = logging.getLogger("mv")
 @asynccontextmanager
 async def _vida(app: FastAPI):
     db.init_db()
+    from . import correo
+    correo.instalar()
     scheduler.iniciar()
     est = db.estado_datos()
     log.info("%s v%s lista · LLM=%s · datos=%s · %s empresas · %s usuarios activos · %s sesiones · disco %s", settings.APP_NAME, settings.VERSION,
@@ -35,7 +37,7 @@ async def _vida(app: FastAPI):
 
 app = FastAPI(title=settings.APP_NAME, version=settings.VERSION, docs_url=None, redoc_url=None, openapi_url=None, lifespan=_vida)
 app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "web" / "static")), name="static")
-for r in (auth.router, colaborador.router, api.router, gestion.router, tableros.router, admin.router, exportes.router):
+for r in (auth.router, colaborador.router, socrates.router, api.router, gestion.router, tableros.router, admin.router, exportes.router):
     app.include_router(r)
 
 

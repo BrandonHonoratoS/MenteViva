@@ -21,6 +21,7 @@
     {% for href, nombre, icono in nav %}<a href="{{ href }}" class="{{ 'on' if ruta == href or (href != '/' and ruta.startswith(href + '/')) else '' }}">{{ m.icon(icono) }}<span>{{ nombre }}</span></a>{% endfor %}
     <a href="/notificaciones" class="{{ 'on' if ruta == '/notificaciones' else '' }}">{{ m.icon('bell') }}<span>Avisos</span>{% if no_leidas %}<span class="chip rose" style="margin-left:auto">{{ no_leidas }}</span>{% endif %}</a>
     <a href="/cuenta" class="{{ 'on' if ruta == '/cuenta' else '' }}">{{ m.icon('key') }}<span>Mi cuenta</span></a>
+    <a href="/ayuda" class="{{ 'on' if ruta == '/ayuda' else '' }}">{{ m.icon('help') }}<span>Ayuda</span></a>
     <a href="/salir">{{ m.icon('out') }}<span>Salir</span></a>
   </nav>
   <div class="foot">{{ u.nombre }} · {{ NOMBRES_ROL[u.rol] }}{% if u.area_nombre %} · {{ u.area_nombre }}{% endif %}<br>v{{ VERSION }}</div>
@@ -32,6 +33,7 @@
     <div><h1>{% block titulo %}{{ self.title() }}{% endblock %}</h1><p class="sub">{% block subtitulo %}{% endblock %}</p></div>
     <div class="grow"></div>
     {% block acciones %}{% endblock %}
+    <a class="bell" href="/ayuda" title="Ayuda e instrucciones">{{ m.icon('help') }}</a>
     <a class="bell" href="/notificaciones" title="Avisos">{{ m.icon('bell') }}{% if no_leidas %}<span class="dot"></span>{% endif %}</a>
     <div class="userbox"><span class="uavatar" style="background:{{ u.color or '#7C3AED' }}">{{ u.nombre[:1] }}</span><div><div class="n">{{ u.nombre }}</div><div class="r">{{ NOMBRES_ROL[u.rol] }}</div></div></div>
   </div>

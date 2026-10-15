@@ -1,0 +1,58 @@
+{% extends "base.html" %}{% block title %}Sócrates{% endblock %}
+{% block subtitulo %}Tu tutor: la teoría de alto nivel, personalizada a tu trabajo, antes de cada práctica{% endblock %}
+{% block content %}
+{% if error %}<div class="alert err mb">{{ error }}</div>{% endif %}
+<div class="grid g-2-1">
+  <div class="stack">
+    <div class="card hero">
+      <div class="row" style="gap:26px">
+        <div class="orb-wrap"><div class="orb" style="--c1:{{ avatar.color }};--c2:#A855F7"></div><b>{{ avatar.nombre }}</b><span class="muted tiny">{{ avatar.rol }}</span></div>
+        <div style="flex:1;min-width:240px">
+          <h2 style="font-size:1.4rem">Master classes hechas para ti</h2>
+          <p class="muted">Cada lección se construye con tu rol, tu industria, tu producto y tu plan: marcos y modelos de referencia con fuentes, un mapa conceptual, proceso paso a paso, un caso resuelto en tu contexto, preguntas socráticas y un checklist para tu siguiente sesión. Lectura de 12–20 minutos (o por bloques de 5) y chat para dudas.</p>
+          <span class="chip aqua">{{ restantes }} lecciones nuevas disponibles este mes</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Prepárate para tus próximas sesiones</h2>
+      {% for d in del_plan %}{% set hab = HABILIDADES[d.habilidad] %}
+      <div class="kpi-row" style="grid-template-columns:1fr auto">
+        <div><span class="chip">{{ hab.corto }} · semana {{ d.item.semana }}{% if d.item.competencia %} · {{ d.item.competencia }}{% endif %}{% if d.item.tipo == 'laboratorio' %} · 🧪 laboratorio{% endif %}</span>
+          <div class="mt" style="margin-top:6px"><b>{{ d.item.objetivo }}</b></div><div class="muted small">Master class: {{ d.tema }}</div></div>
+        <div>{% if d.leccion and d.leccion.estado == 'lista' %}<a class="btn primary sm" href="/socrates/{{ d.leccion.id }}">Leer</a>
+          {% elif d.leccion and d.leccion.estado == 'generando' %}<a class="btn sm" href="/socrates/{{ d.leccion.id }}">Preparando…</a>
+          {% else %}<form method="post" action="/socrates/estudiar"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="habilidad" value="{{ d.habilidad }}"><input type="hidden" name="tema" value="{{ d.tema }}"><input type="hidden" name="competencia" value="{{ d.item.competencia }}"><input type="hidden" name="item" value="{{ d.item.id }}"><button class="btn primary sm" type="submit">Prepárate con Sócrates</button></form>{% endif %}</div>
+      </div>
+      {% else %}<div class="empty">No tienes sesiones pendientes en tu plan. Explora la biblioteca.</div>{% endfor %}
+    </div>
+
+    {% for b in biblioteca %}
+    <div class="card">
+      <div class="row between"><h2>{{ b.hab.nombre }}</h2><span class="muted small">biblioteca · {{ b.temas|length }} temas</span></div>
+      <div class="grid g2">
+      {% for tm in b.temas %}
+        <div style="padding:12px;border:1px solid var(--line);border-radius:14px">
+          <b>{{ tm.tema }}</b>{% if tm.nivel %}<span class="chip tiny" style="margin-left:6px">{{ tm.nivel }}</span>{% endif %}
+          <div class="muted small">{{ tm.descripcion }}</div>
+          <div class="mt" style="margin-top:8px">{% if tm.leccion and tm.leccion.estado == 'lista' %}<a class="btn sm" href="/socrates/{{ tm.leccion.id }}">Releer</a>
+            {% elif tm.leccion and tm.leccion.estado == 'generando' %}<a class="btn sm" href="/socrates/{{ tm.leccion.id }}">Preparando…</a>
+            {% else %}<form method="post" action="/socrates/estudiar" style="display:inline"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="habilidad" value="{{ b.hab.id }}"><input type="hidden" name="tema" value="{{ tm.tema }}"><input type="hidden" name="competencia" value="{{ tm.competencia }}"><button class="btn sm" type="submit">Estudiar</button></form>{% endif %}</div>
+        </div>
+      {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="stack">
+    <div class="card"><h2>Mis lecciones</h2>
+      {% for lec in lecciones %}<div class="row between small mb"><span><b>{{ lec.titulo or lec.tema }}</b><div class="muted tiny">{{ lec.habilidad|hab_corto }} · {{ lec.creado_en|fecha_corta }}{% if lec.leida_en %} · leída{% endif %}</div></span>
+        <a class="btn sm" href="/socrates/{{ lec.id }}">{{ 'Abrir' if lec.estado == 'lista' else ('…' if lec.estado == 'generando' else 'Reintentar') }}</a></div>
+      {% else %}<div class="empty">Aún no tienes lecciones.</div>{% endfor %}</div>
+    <div class="card dark"><div class="cap" style="color:rgba(255,255,255,.6)">Cómo aprovecharlo</div>
+      <p class="small" style="color:#fff">Lee la master class antes de la práctica (o en tres bloques de 5 minutos: mapa + marcos, proceso + caso, preguntas + checklist). Responde las preguntas socráticas por escrito en tu cabeza antes de abrir la respuesta modelo. Lleva el checklist a tu sesión con el avatar.</p></div>
+  </div>
+</div>
+{% endblock %}

@@ -23,8 +23,9 @@
     const previo = JSON.parse(ob.dataset.previo || '{}');
     const resp = { ...previo };
     let i = 0;
-    const visibles = () => vars.filter(v => !(grupoVentas.includes(v.id) && !vende()));
-    function vende() { const f = resp.funciones || []; return f.includes('Vendo o asesoro a clientes') || f.includes('Genero negocio nuevo') || f.includes('Otro'); }
+    const esEmpresa = () => !resp.contexto || resp.contexto === 'Trabajo en una empresa' || resp.contexto === 'Otra';
+    const visibles = () => vars.filter(v => !(grupoVentas.includes(v.id) && !vende()) && !(v.grupo === 'Ruta DM' && !esEmpresa()));
+    function vende() { const f = resp.funciones || []; return f.includes('Vendo o asesoro a clientes') || f.includes('Atiendo clientes en mi negocio u oficio') || f.includes('Genero negocio nuevo') || f.includes('Otro') || resp.contexto === 'Tengo mi negocio u oficio'; }
     function render() {
       const lista = visibles(); if (i >= lista.length) { i = lista.length - 1; }
       const v = lista[i];
@@ -135,6 +136,15 @@
     // Sin apertura del avatar (o último mensaje del usuario sin respuesta): pedirla ahora, con reintento automático.
     if (ses.dataset.estado === 'en_curso') { const ms = $$('#msgs .msg'); const ultimo = ms[ms.length - 1]; if (!ultimo || ultimo.classList.contains('usuario')) { pendiente = !!ultimo; continuar(true); } }
     scroll(); ta?.focus();
+    // modalidad "Prepárate 5 minutos": cuenta un bloque y avisa que se puede pausar
+    const bloque = $('#bloque');
+    if (bloque) {
+      const total = (+bloque.dataset.min || 5) * 60; const t0 = Date.now(); let hecho = false;
+      const tick = setInterval(async () => {
+        const s = Math.max(0, total - Math.floor((Date.now() - t0) / 1000)); $('#bloque-v').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); $('#bloque-bar').style.width = Math.round(((total - s) / total) * 100) + '%';
+        if (s === 0 && !hecho) { hecho = true; clearInterval(tick); try { const r = await api('/api/actividad/bloque'); $('#bloque-msg').innerHTML = '<b>Bloque completado 🔥</b> Racha: ' + r.racha + ' día' + (r.racha === 1 ? '' : 's') + ' · hoy ' + r.bloques_hoy + ' bloques. Puedes continuar o volver más tarde: la sesión se queda abierta.'; toast('¡Bloque de 5 minutos completado!'); } catch (e) { } }
+      }, 1000);
+    }
   }
 
   /* ── chats simples (analista / coach) ───────────────────────────── */
@@ -183,6 +193,34 @@
       new Chart(c, { type: 'doughnut', data: { labels: d.labels, datasets: [{ data: d.values, backgroundColor: d.colors || ['#7C3AED', '#A855F7', '#06B6D4', '#10B981', '#F59E0B', '#F43F5E', '#3B82F6'], borderWidth: 0 }] },
         options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: true, position: 'right' } } } });
     });
+  }
+
+  /* ── Sócrates: pestañas, mapa Mermaid y espera de generación ───── */
+  const tabs = $('#lec-tabs');
+  if (tabs) {
+    $$('button', tabs).forEach(b => b.onclick = () => { $$('button', tabs).forEach(x => x.classList.toggle('on', x === b)); $$('.tab-pane').forEach(p => p.style.display = p.dataset.pane === b.dataset.tab ? 'block' : 'none'); window.scrollTo({ top: tabs.offsetTop - 80, behavior: 'smooth' }); });
+  }
+  const mapa = $('#mapa');
+  if (mapa) {
+    const src = $('.mermaid-src', mapa).textContent.trim();
+    const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.12.0/mermaid.min.js';
+    s.onload = async () => {
+      try {
+        mermaid.initialize({ startOnLoad: false, theme: 'base', securityLevel: 'strict', themeVariables: { primaryColor: '#EDE9FE', primaryBorderColor: '#7C3AED', primaryTextColor: '#1E1B4B', lineColor: '#06B6D4', fontFamily: 'Instrument Sans, system-ui, sans-serif', fontSize: '14px' }, flowchart: { curve: 'basis', padding: 12 } });
+        const { svg } = await mermaid.render('mapa-svg', src);
+        mapa.innerHTML = svg;
+      } catch (e) { mapa.innerHTML = '<div class="muted small">El mapa no se pudo dibujar; aquí está su estructura:</div><pre class="small" style="white-space:pre-wrap">' + esc(src) + '</pre>'; }
+    };
+    s.onerror = () => { mapa.innerHTML = '<pre class="small" style="white-space:pre-wrap">' + esc(src) + '</pre>'; };
+    document.head.appendChild(s);
+  }
+  const espera = $('#lec-espera');
+  if (espera) {
+    const id = espera.dataset.id;
+    (async function poll() {
+      try { const r = await fetch('/api/socrates/' + id + '/estado').then(x => x.json()); if (r.estado !== 'generando') { location.reload(); return; } } catch (e) { }
+      setTimeout(poll, 4000);
+    })();
   }
 
   /* filas clicables y confirmaciones */

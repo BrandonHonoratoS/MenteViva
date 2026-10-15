@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 from .. import db, metrics
+from ..config import settings
 from ..agents import catalogo as C
 from ..agents import laboratorio as L
 from ..agents import motor
@@ -28,13 +29,19 @@ def hoy(request: Request, u: dict = Depends(colab)):
     en_curso = db.sesion_en_curso(u["id"])
     resumen = metrics.resumen_colaborador(db.usuario(u["id"]))
     siguiente = db.siguiente_item(u["id"]) if perfil.get("estado") == "completo" else None
+    if siguiente:
+        from ..agents import socrates as S
+        siguiente["tema_socrates"] = S.tema_para_item(siguiente["habilidad"], siguiente)
+        lec = db.leccion_por_tema(u["id"], siguiente["habilidad"], siguiente["tema_socrates"])
+        siguiente["leccion"] = lec if lec and lec["estado"] == "lista" else None
     roadmaps = db.roadmaps(u["id"], ("activo", "propuesto"))
-    recientes = [s for s in db.sesiones(usuario_id=u["id"], estado="completada", limite=5) if s["tipo"] == "practica"]
+    recientes = [s for s in db.sesiones(usuario_id=u["id"], estado="completada", limite=5) if s["tipo"] in ("practica", "laboratorio")]
     niveles = db.niveles(u["id"])
     serie = metrics.serie_scores(u["id"])
     notif = db.notificaciones(u["id"], solo_no_leidas=True, limite=5)
     return render(request, "hoy.html", u, perfil=perfil, en_curso=en_curso, resumen=resumen, siguiente=siguiente, roadmaps=roadmaps, recientes=recientes,
-                  niveles=niveles, serie=serie, notif=notif, habilidades=_habilidades(u))
+                  niveles=niveles, serie=serie, notif=notif, habilidades=_habilidades(u), encuesta_pendiente=db.pendiente_encuesta(u["id"]),
+                  racha=db.racha_dias(u["id"]), hoy_act=db.actividad_hoy(u["id"]), micro_min=settings.MICRO_MINUTOS, micro_horas=settings.MICRO_HORAS)
 
 
 # ── diagnóstico con Elena ────────────────────────────────────────────────────
@@ -107,9 +114,16 @@ def roadmaps(request: Request, u: dict = Depends(colab)):
     return render(request, "roadmaps.html", u, roadmaps=rms, niveles=db.niveles(u["id"]), en_curso=db.sesion_en_curso(u["id"]), perfil=db.perfil(u["id"]))
 
 
+def _relevantes(u: dict, perfil: dict | None = None) -> tuple[list[dict], list[dict]]:
+    perfil = perfil or db.perfil(u["id"])
+    return C.habilidades_relevantes(perfil.get("onboarding") or {}, perfil.get("diagnostico"), _habilidades(u))
+
+
 @router.get("/catalogo")
 def catalogo(request: Request, u: dict = Depends(colab)):
-    return render(request, "catalogo.html", u, habilidades=_habilidades(u), proximamente=C.PROXIMAMENTE, niveles=db.niveles(u["id"]), perfil=db.perfil(u["id"]),
+    perfil = db.perfil(u["id"])
+    relevantes, otras = _relevantes(u, perfil)
+    return render(request, "catalogo.html", u, habilidades=relevantes, otras=otras, proximamente=C.PROXIMAMENTE, niveles=db.niveles(u["id"]), perfil=perfil,
                   en_curso=db.sesion_en_curso(u["id"]))
 
 
@@ -132,7 +146,13 @@ def entrenar(request: Request, habilidad: str, u: dict = Depends(colab), item: i
     niv = db.nivel(u["id"], habilidad) or {}
     nivel = (it or {}).get("nivel") or niv.get("nivel") or hab["niveles"][0]
     sig_dm = C.nivel_dm_siguiente(nivel) if habilidad == "ruta_dm" else None
-    return render(request, "entrenar.html", u, hab=hab, item=it, nivel=nivel, niv=niv, perfil=perfil, avatar=AVATARES[hab["agente"]],
+    from ..agents import socrates as S
+    leccion = None
+    if it and (u.get("modalidad") or "completa") == "completa":
+        lec = db.leccion_por_tema(u["id"], habilidad, S.tema_para_item(habilidad, it))
+        leccion = lec if lec and lec["estado"] == "lista" else None
+    return render(request, "entrenar.html", u, hab=hab, item=it, nivel=nivel, niv=niv, perfil=perfil, avatar=AVATARES[hab["agente"]], leccion=leccion,
+                  tema_socrates=S.tema_para_item(habilidad, it) if it else "",
                   competencias=C.competencias_dm(sig_dm) if sig_dm else [], sig_dm=sig_dm, valor_dm=C.valor_dm(sig_dm) if sig_dm else "",
                   duracion=C.duracion_min(habilidad, nivel), kpis=hab.get("kpis", []), pesos=(hab.get("pesos") or {}).get(nivel, {}))
 
@@ -211,7 +231,7 @@ def sesion(request: Request, sid: int, u: dict = Depends(requiere_usuario)):
         return RedirectResponse(f"/sesion/{sid}/reporte", status_code=307)
     hab = C.HABILIDADES[s["habilidad"]]
     return render(request, "sesion.html", u, s=s, hab=hab, avatar=AVATARES[s["agente"]], mensajes=db.mensajes(sid),
-                  turnos_max=C.turnos_max_sesion(s), duracion=C.duracion_sesion(s), propia=s["usuario_id"] == u["id"])
+                  turnos_max=C.turnos_max_sesion(s), duracion=C.duracion_sesion(s), propia=s["usuario_id"] == u["id"], micro_min=settings.MICRO_MINUTOS)
 
 
 @router.get("/sesion/{sid}/reporte")
@@ -233,7 +253,32 @@ def reporte(request: Request, sid: int, u: dict = Depends(requiere_usuario)):
                   kpis_def={k["id"]: k for k in hab.get("kpis", [])}, pesos=(hab.get("pesos") or {}).get(s.get("nivel") or "", {}),
                   siguiente=db.siguiente_item(s["usuario_id"], s["habilidad"]), analisis=analisis[0] if analisis else None,
                   mostrar_transcripcion=puede_ver_transcripcion(u, s), mensajes=db.mensajes(sid) if puede_ver_transcripcion(u, s) else [],
-                  minutos=motor.minutos_transcurridos(s))
+                  minutos=motor.minutos_transcurridos(s), encuesta_pendiente=db.pendiente_encuesta(u["id"]) if s["usuario_id"] == u["id"] else None)
+
+
+# ── encuesta de primera experiencia ──────────────────────────────────────────
+@router.get("/encuesta")
+def encuesta(request: Request, u: dict = Depends(colab)):
+    from .. import encuesta as ENC
+    return render(request, "encuesta.html", u, secciones=ENC.SECCIONES, previo={}, faltan=[], hecha=bool(db.encuesta_de(u["id"])))
+
+
+@router.post("/encuesta")
+async def encuesta_post(request: Request, u: dict = Depends(colab)):
+    from .. import encuesta as ENC
+    form = await request.form()
+    verificar_csrf(request, u, form.get("csrf"))
+    if db.encuesta_de(u["id"]):
+        return RedirectResponse("/encuesta", status_code=303)
+    respuestas, faltan = ENC.validar(form)
+    if faltan:
+        return render(request, "encuesta.html", u, secciones=ENC.SECCIONES, previo=respuestas, faltan=faltan, hecha=False, status_code=400)
+    primera = db.pendiente_encuesta(u["id"])
+    db.guardar_encuesta(u["id"], u.get("empresa_id"), respuestas, sesion_id=(primera or {}).get("id"))
+    db.log("info", "encuesta", f"Encuesta de experiencia respondida por {u['email']}", f"calificación {respuestas.get('calificacion')} · NPS {respuestas.get('nps')}", u["email"])
+    for m in db.usuarios(rol="superadmin"):
+        db.notificar(m["id"], f"Nueva encuesta de experiencia: {u['nombre']}", f"Calificación {respuestas.get('calificacion')}/10 · NPS {respuestas.get('nps')} · pagaría: {respuestas.get('pagaria')}", "/admin/encuestas", "exito")
+    return RedirectResponse("/encuesta", status_code=303)
 
 
 @router.get("/historial")

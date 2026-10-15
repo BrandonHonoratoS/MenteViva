@@ -10,6 +10,7 @@
       <div class="row between"><span class="muted small">Tiempo</span><span class="timer" id="timer">0:00</span></div>
       <div class="row between"><span class="muted small">Turnos</span><b id="turnos">{{ s.turnos }} / {{ turnos_max }}</b></div>
       <div class="muted tiny">Sugerido: ~{{ duracion }} min. Escribe <b>Fin</b> para cerrar cuando quieras.</div>
+      {% if propia and u.modalidad == 'micro' and s.estado == 'en_curso' %}<div class="mt" id="bloque" data-min="{{ micro_min }}"><div class="row between"><span class="muted small">⏱ Bloque de {{ micro_min }} min</span><b id="bloque-v">{{ micro_min }}:00</b></div><div class="bar"><i id="bloque-bar" style="width:0"></i></div><div class="tiny muted mt" id="bloque-msg">Al terminar el bloque puedes pausar: la sesión te espera.</div></div>{% endif %}
     </div>
     <div class="card">
       {% if s.agente == 'elena' %}

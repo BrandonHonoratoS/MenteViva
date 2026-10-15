@@ -25,7 +25,18 @@ def admin(request: Request, u: dict = Depends(sa), ok: str = "", error: str = ""
                           "api_key": bool(settings.GEMINI_API_KEY), "precios": settings.PRICE_TABLE},
                   presupuesto_full=db.presupuesto(), ok=ok, error=error, clave=clave, superadmins=db.usuarios(rol="superadmin", activos=None),
                   rrhh_por_empresa={e["id"]: [x for x in db.usuarios(e["id"], activos=None) if x["rol"] in ("rrhh", "dg")] for e in db.empresas()},
-                  password_min=settings.PASSWORD_MIN, datos=db.estado_datos())
+                  password_min=settings.PASSWORD_MIN, datos=db.estado_datos(),
+                  correo={"activo": __import__("app.correo", fromlist=["activo"]).activo(), "host": settings.SMTP_HOST, "puerto": settings.SMTP_PORT, "usuario": settings.SMTP_USER, "desde": settings.SMTP_FROM,
+                          "micro_horas": settings.MICRO_HORAS})
+
+
+@router.post("/correo/probar")
+def correo_probar(request: Request, u: dict = Depends(sa), csrf: str = Form(""), destinatario: str = Form("")):
+    verificar_csrf(request, u, csrf)
+    from .. import correo
+    ok, msg = correo.probar((destinatario or u["email"]).strip())
+    from urllib.parse import quote
+    return RedirectResponse(f"/admin?{'ok' if ok else 'error'}={quote(msg)}", status_code=303)
 
 
 @router.get("/respaldo.db")
@@ -139,6 +150,44 @@ def superadmin_crear(request: Request, u: dict = Depends(sa), csrf: str = Form("
     except Exception:  # noqa: BLE001
         return RedirectResponse("/admin?error=Ese+correo+ya+existe", status_code=303)
     return RedirectResponse(f"/admin?ok=Superadministrador+creado&clave={clave}", status_code=303)
+
+
+@router.get("/empresas/{eid}/estandares")
+def estandares_empresa(request: Request, eid: int, u: dict = Depends(sa), ok: int = 0):
+    from .gestion import _pantalla_estandares
+    e = db.empresa(eid)
+    if not e:
+        raise HTTPException(404)
+    return _pantalla_estandares(request, u, e, f"/admin/empresas/{eid}/estandares", ok)
+
+
+@router.post("/empresas/{eid}/estandares")
+async def estandares_empresa_post(request: Request, eid: int, u: dict = Depends(sa)):
+    from ..agents import estandares as ES
+    form = await request.form()
+    verificar_csrf(request, u, form.get("csrf"))
+    e = db.empresa(eid)
+    if not e:
+        raise HTTPException(404)
+    ES.guardar(eid, ES.normalizar(form, [h["id"] for h in ES.habilidades_editables(e)]))
+    db.log("info", "estandares", f"Estándares actualizados por Mente Viva: {e['nombre']}", "", u["email"])
+    return RedirectResponse(f"/admin/empresas/{eid}/estandares?ok=1", status_code=303)
+
+
+@router.get("/encuestas")
+def encuestas(request: Request, u: dict = Depends(sa)):
+    from .. import encuesta as ENC
+    lista = db.encuestas()
+    elegibles = len({s["usuario_id"] for s in db.sesiones(estado="completada", limite=20000) if s["tipo"] in ("practica", "laboratorio")})
+    return render(request, "encuestas.html", u, lista=lista, r=ENC.resumen(lista, True), incluir_precio=True, elegibles=elegibles)
+
+
+@router.get("/encuestas.xlsx")
+def encuestas_xlsx(u: dict = Depends(sa)):
+    from ..reports import excel
+    datos = excel.encuestas(db.encuestas(), incluir_precio=True)
+    return Response(datos, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": 'attachment; filename="menteviva_encuestas.xlsx"'})
 
 
 @router.get("/uso")

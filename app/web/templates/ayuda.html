@@ -1,0 +1,58 @@
+{% extends "base.html" %}{% block title %}Ayuda{% endblock %}
+{% block subtitulo %}Cómo usar Mente Viva paso a paso · si algo no funciona, escríbenos{% endblock %}
+{% block content %}
+<div class="grid g-2-1">
+  <div class="stack">
+    {% if u.rol == 'colaborador' %}
+    <div class="card"><h2>Tu ruta en Mente Viva</h2>
+      <ul class="list">
+        <li><span class="n">1</span><div><b>Diagnóstico con Elena Ríos</b><div class="small muted">Un cuestionario de 2 minutos (botones) y una entrevista conversacional de ~25 min. Responde con ejemplos reales (situación, lo que hiciste, resultado). Al terminar tendrás tu perfil, tus niveles y tus planes.</div></div></li>
+        <li><span class="n">2</span><div><b>Hoy · tu siguiente sesión</b><div class="small muted">En “Hoy” siempre aparece el siguiente paso de tu plan. Puedes <b>prepararte con Sócrates</b> (teoría de alto nivel, adaptada a tu trabajo) y luego <b>Entrenar</b> con el avatar.</div></div></li>
+        <li><span class="n">3</span><div><b>Sesión con un avatar</b><div class="small muted">Celeste (ventas), Elena (entrevistas) o Juan (Ruta DM) viven el escenario contigo y no te corrigen durante la práctica. Escribe como hablarías. Cuando quieras cerrar, escribe <b>Fin</b> o pulsa “Terminar y analizar”. Si la IA tarda o falla, aparece <b>Reintentar</b>: nada se pierde.</div></div></li>
+        <li><span class="n">4</span><div><b>Reporte</b><div class="small muted">Puntaje por KPI o dimensión con evidencia textual, fortalezas, oportunidades, momentos clave y plan de acción; puedes preguntarle al coach sobre tu reporte y descargarlo en PDF. El Analista recalcula tu plan después de cada sesión.</div></div></li>
+        <li><span class="n">5</span><div><b>Laboratorio DM</b> (si tu empresa tiene la Ruta DM)<div class="small muted">Dos casos reales (entrega bajo presión y war room). Juan es evaluador neutral: responde como actuarías; el reporte de 100 puntos llega al final.</div></div></li>
+        <li><span class="n">6</span><div><b>Modalidades</b><div class="small muted"><b>Completa</b>: una sesión de 15–25 min. <b>Prepárate 5 minutos</b>: tres bloques cortos al día con avisos y racha diaria; las sesiones se quedan abiertas si te interrumpen. Tú la eliges en “Mi cuenta” según tus tiempos; el contenido y el análisis son los mismos.</div></div></li>
+      </ul></div>
+    <div class="card"><h2>Preguntas frecuentes</h2>
+      <details><summary><b>El avatar no responde o sale “saturado”.</b></summary><p class="small">Pulsa <b>Reintentar</b>; la plataforma cambia automáticamente a un modelo de respaldo. Si persiste más de 2 minutos, avísanos.</p></details>
+      <details><summary><b>Me salí a media sesión.</b></summary><p class="small">Vuelve a “Hoy” → “Continuar”. La conversación sigue donde la dejaste.</p></details>
+      <details><summary><b>¿Quién ve mis conversaciones?</b></summary><p class="small">Sólo tú y Recursos Humanos de tu empresa. Tu director y Dirección General ven scores, retroalimentación y planes, nunca el diálogo.</p></details>
+      <details><summary><b>¿Cuánto cuesta usar la IA?</b></summary><p class="small">Nada para ti: tu empresa tiene un paquete mensual. Si se agota, los agentes se pausan hasta ampliarlo.</p></details>
+      <details><summary><b>Quiero cambiar mi contraseña o mis avisos por correo.</b></summary><p class="small">En “Mi cuenta”: contraseña, modalidad y si quieres recibir los avisos también por correo.</p></details>
+    </div>
+    {% elif u.rol == 'director' %}
+    <div class="card"><h2>Como director de área</h2>
+      <ul class="list">
+        <li><span class="n">1</span><div><b>Mi equipo</b><div class="small muted">Índices del área, evolución, quién requiere atención y la ficha de cada persona (niveles, sesiones, planes, lecturas del Analista). No ves transcripciones.</div></div></li>
+        <li><span class="n">2</span><div><b>Metas</b><div class="small muted">Define un score mínimo por habilidad (y competencia DM) con plazo. El Analista recalibra al momento los planes de las personas afectadas y te avisa cuando una meta se cumple.</div></div></li>
+        <li><span class="n">3</span><div><b>Evaluación mensual</b><div class="small muted">Cinco preguntas por colaborador; alimentan el índice de aplicación y transferencia.</div></div></li>
+        <li><span class="n">4</span><div><b>Analista</b><div class="small muted">Pregúntale en lenguaje natural (“¿quién necesita atención?”, “¿cómo va Sofía?”); responde sólo con datos de tu área y puede investigar con fuentes.</div></div></li>
+      </ul></div>
+    {% elif u.rol == 'rrhh' %}
+    <div class="card"><h2>Como Recursos Humanos</h2>
+      <ul class="list">
+        <li><span class="n">1</span><div><b>Áreas y personas</b><div class="small muted">Crea áreas, asigna directores, da de alta a las personas (con contraseña o temporal), ve la modalidad que eligió cada quien (completa o 5 minutos) y restablece contraseñas.</div></div></li>
+        <li><span class="n">2</span><div><b>Aprobaciones</b><div class="small muted">Ascensos en la Ruta DM, planes propuestos fuera del rol y propuestas del Analista: nada cambia sin tu aprobación.</div></div></li>
+        <li><span class="n">3</span><div><b>Estándares</b><div class="small muted">Escribe la metodología con la que tu empresa vende, entrevista o se comunica (AIDA, etapas propias, estilo de presentaciones…): los avatares y Sócrates entrenan y evalúan con ella; vacío = estándar de Mente Viva.</div></div></li>
+        <li><span class="n">4</span><div><b>Metas, evaluaciones y análisis</b><div class="small muted">Metas por empresa/área/persona; evaluación de líderes; lecturas y resúmenes semanales del Analista; exportes a Excel y PDF.</div></div></li>
+        <li><span class="n">4</span><div><b>Experiencia</b><div class="small muted">Respuestas de la encuesta de primera experiencia de tu gente (sin la sección de precio, que es investigación de Mente Viva).</div></div></li>
+        <li><span class="n">5</span><div><b>Privacidad</b><div class="small muted">Eres el único rol, además de la propia persona, que puede leer transcripciones. Úsalas con criterio.</div></div></li>
+      </ul></div>
+    {% elif u.rol == 'dg' %}
+    <div class="card"><h2>Como Dirección General</h2><p class="small">El tablero muestra el IIHO y los índices de la organización (IDSS, madurez, participación, engagement, aplicación, transferencia, evolución) con nombres en top y atención; cada indicador explica su fórmula en “¿Cómo se calcula?”. El Analista responde preguntas sobre toda la empresa y los análisis guardan las lecturas semanales.</p></div>
+    {% else %}
+    <div class="card"><h2>Equipo Mente Viva</h2><p class="small">Empresas y usuarios RRHH, habilidades personalizadas por empresa, modelo de IA y presupuesto (tope duro), uso por origen, encuestas de experiencia (con precio), bitácora, estado de los datos y respaldo. Correo: configura SMTP en Render → Environment y pruébalo desde Plataforma.</p></div>
+    {% endif %}
+  </div>
+  <div class="stack">
+    <div class="card dark">
+      <div class="cap" style="color:rgba(255,255,255,.6)">¿Algo no funciona o no sabes cómo seguir?</div>
+      <h2 style="color:#fff">Habla con {{ soporte.nombre }}</h2>
+      <p class="muted">Responsable de Mente Viva para tu empresa. Cuéntale qué intentabas hacer y qué pasó (una captura ayuda).</p>
+      <a class="btn block mt" style="background:#fff" href="https://wa.me/52{{ soporte.tel|replace(' ','') }}?text={{ ('Hola ' ~ soporte.nombre.split(' ')[0] ~ ', necesito ayuda con Mente Viva: ')|urlencode }}" target="_blank" rel="noopener">WhatsApp · {{ soporte.tel }}</a>
+      <a class="btn block mt" style="background:rgba(255,255,255,.15);color:#fff" href="mailto:{{ soporte.email }}?subject={{ 'Ayuda Mente Viva'|urlencode }}">{{ soporte.email }}</a>
+    </div>
+    <div class="card"><div class="cap">Antes de escribir, prueba</div><ul class="list"><li><span class="n">1</span><div class="small">Recargar la página (F5) o pulsar <b>Reintentar</b>.</div></li><li><span class="n">2</span><div class="small">Revisar “Avisos” (campana): ahí llegan los resultados y los cambios de tu plan.</div></li><li><span class="n">3</span><div class="small">Entrar desde computadora si estás en el celular con mala señal.</div></li></ul></div>
+  </div>
+</div>
+{% endblock %}

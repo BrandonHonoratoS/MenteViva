@@ -1,5 +1,6 @@
 {% extends "base.html" %}{% block title %}Hoy{% endblock %}
-{% block subtitulo %}Hola, {{ u.nombre.split(' ')[0] }}. {% if resumen.racha %}Llevas {{ resumen.racha }} semana{{ 's' if resumen.racha != 1 }} seguida{{ 's' if resumen.racha != 1 }} practicando.{% else %}Una práctica de 15 minutos cambia la semana.{% endif %}{% endblock %}
+{% block subtitulo %}Hola, {{ u.nombre.split(' ')[0] }}. {% if racha and racha.dias %}Racha de {{ racha.dias }} día{{ 's' if racha.dias != 1 }} 🔥{% if not racha.hoy %} · hoy aún no sumas{% endif %}.{% elif resumen.racha %}Llevas {{ resumen.racha }} semana{{ 's' if resumen.racha != 1 }} seguida{{ 's' if resumen.racha != 1 }} practicando.{% else %}Una práctica de 15 minutos cambia la semana.{% endif %}{% endblock %}
+{% block acciones %}{% if racha %}<span class="racha" title="Días consecutivos con actividad (mejor: {{ racha.mejor }})">{{ m.icon('fire') }} {{ racha.dias }}</span>{% endif %}{% endblock %}
 {% block content %}
 {% if perfil.estado != 'completo' %}
 <div class="card hero">
@@ -14,6 +15,11 @@
   </div>
 </div>
 {% else %}
+{% if u.modalidad == 'micro' %}
+<div class="card mb" style="margin-bottom:18px"><div class="row between"><div><span class="chip aqua">⏱ Prepárate 5 minutos</span><h2 style="margin-top:8px;font-size:1.2rem">Hoy: {{ hoy_act.bloques }} de {{ micro_horas|length }} bloques</h2><p class="muted small">Tres bloques de {{ micro_min }} minutos al día (avisos a las {{ micro_horas|join(':00, ') }}:00). Las sesiones se quedan abiertas si te interrumpen; cada bloque suma a tu racha.</p></div>
+  <div class="row" style="gap:6px">{% for i in range(micro_horas|length) %}<span class="chip {{ 'mint' if i < hoy_act.bloques else 'gris' }}">{{ i + 1 }}</span>{% endfor %}</div></div></div>
+{% endif %}
+{% if encuesta_pendiente %}<div class="card hero mb" style="margin-bottom:18px"><div class="row between"><div><span class="chip aqua">3 minutos</span><h2 style="margin-top:8px">¿Cómo fue tu primera práctica?</h2><p class="muted">Eres de las primeras personas en usar Mente Viva. Cuéntanos qué te gustó, qué cambiarías y qué valor le ves: lo que digas define lo que construimos.</p></div><a class="btn primary" href="/encuesta">Contar mi experiencia</a></div></div>{% endif %}
 <div class="grid g-2-1">
   <div class="stack">
     {% if en_curso %}
@@ -27,7 +33,9 @@
           <span class="chip">Tu siguiente sesión · semana {{ siguiente.semana }}{% if siguiente.tipo == 'refuerzo' %} · refuerzo{% elif siguiente.tipo == 'laboratorio' %} · 🧪 Laboratorio DM{% endif %}</span>
           <h2 style="font-size:1.4rem;margin-top:8px">{{ siguiente.objetivo }}</h2>
           <p class="muted">{{ hab.nombre }} con {{ av.nombre }} · nivel {{ siguiente.nivel }}{% if siguiente.competencia %} · {{ siguiente.competencia }}{% endif %}{% if siguiente.porque %}<br><i>{{ siguiente.porque }}</i>{% endif %}</p>
-          <div class="row mt"><a class="btn primary lg" href="{{ '/laboratorio?item=' ~ siguiente.id if siguiente.tipo == 'laboratorio' else '/entrenar/' ~ siguiente.habilidad ~ '?item=' ~ siguiente.id }}">{{ 'Entrar al laboratorio' if siguiente.tipo == 'laboratorio' else 'Entrenar ahora' }}</a><a class="btn" href="/roadmaps">Ver mi plan</a></div>
+          <div class="row mt"><a class="btn primary lg" href="{{ '/laboratorio?item=' ~ siguiente.id if siguiente.tipo == 'laboratorio' else '/entrenar/' ~ siguiente.habilidad ~ '?item=' ~ siguiente.id }}">{{ 'Entrar al laboratorio' if siguiente.tipo == 'laboratorio' else 'Entrenar ahora' }}</a>
+            <form method="post" action="/socrates/estudiar" style="display:inline"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="habilidad" value="{{ siguiente.habilidad }}"><input type="hidden" name="tema" value="{{ siguiente.tema_socrates }}"><input type="hidden" name="competencia" value="{{ siguiente.competencia }}"><input type="hidden" name="item" value="{{ siguiente.id }}"><button class="btn" type="submit">📘 {{ 'Releer la master class' if siguiente.leccion else 'Prepárate con Sócrates' }}</button></form>
+            <a class="btn ghost" href="/roadmaps">Ver mi plan</a></div>
         </div>
       </div>
     </div>

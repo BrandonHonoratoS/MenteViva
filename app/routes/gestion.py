@@ -188,6 +188,39 @@ def meta_cerrar(request: Request, mid: int, u: dict = Depends(rrhh_o_director), 
     return RedirectResponse("/metas", status_code=303)
 
 
+# ── metodología y estándares de la empresa ──────────────────────────────────
+def _pantalla_estandares(request, u, empresa, accion, ok):
+    from ..agents import estandares as ES
+    habs = ES.habilidades_editables(empresa)
+    return render(request, "estandares.html", u, empresa=empresa, est=ES.de_empresa(empresa["id"]), habilidades=habs, campos_general=ES.CAMPOS_GENERAL,
+                  campos_habilidad=ES.CAMPOS_HABILIDAD, defaults=ES.DEFAULTS, ruta_dm="ruta_dm" in (empresa.get("habilidades") or []), accion=accion, ok=ok)
+
+
+@router.get("/estandares")
+def estandares(request: Request, u: dict = Depends(rrhh), ok: int = 0):
+    return _pantalla_estandares(request, u, db.empresa(u["empresa_id"]), "/estandares", ok)
+
+
+@router.post("/estandares")
+async def estandares_post(request: Request, u: dict = Depends(rrhh)):
+    from ..agents import estandares as ES
+    form = await request.form()
+    verificar_csrf(request, u, form.get("csrf"))
+    empresa = db.empresa(u["empresa_id"])
+    ES.guardar(empresa["id"], ES.normalizar(form, [h["id"] for h in ES.habilidades_editables(empresa)]))
+    db.log("info", "estandares", f"Estándares actualizados: {empresa['nombre']}", "", u["email"])
+    return RedirectResponse("/estandares?ok=1", status_code=303)
+
+
+# ── encuestas de experiencia (RRHH: sin la sección de precio) ───────────────
+@router.get("/encuestas")
+def encuestas(request: Request, u: dict = Depends(rrhh)):
+    from .. import encuesta as ENC
+    lista = db.encuestas(u["empresa_id"])
+    elegibles = len({s["usuario_id"] for s in db.sesiones(empresa_id=u["empresa_id"], estado="completada", limite=5000) if s["tipo"] in ("practica", "laboratorio")})
+    return render(request, "encuestas.html", u, lista=lista, r=ENC.resumen(lista, False), incluir_precio=False, elegibles=elegibles)
+
+
 # ── análisis y chat con el Analista ──────────────────────────────────────────
 @router.get("/analisis")
 def analisis(request: Request, u: dict = Depends(managers), tipo: str = ""):

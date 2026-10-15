@@ -75,7 +75,7 @@ uid = db.crear_usuario("prueba@prueba.mx", "Prueba12345678", "Sofía Prueba", "c
 did = db.crear_usuario("dir@prueba.mx", "Prueba12345678", "Diana Directora", "director", emp["id"], aid, "Directora", debe_cambiar=False)
 db.actualizar_area(aid, director_id=did)
 u = db.usuario(uid)
-onb = {"funciones": ["Vendo o asesoro a clientes", "Ejecuto proyectos / consultoría"], "industria": "Manufactura / industria", "experiencia": "2 a 5 años",
+onb = {"contexto": "Trabajo en una empresa", "funciones": ["Vendo o asesoro a clientes", "Ejecuto proyectos / consultoría"], "industria": "Manufactura / industria", "experiencia": "2 a 5 años",
        "tipo_producto": "Software / SaaS", "modelo_venta": "A empresas (B2B)", "canal_venta": "Videollamada", "tamano_cliente": "Mediana empresa (100–500)",
        "ticket": "$5,000 — $50,000", "estilo": "Consultivo / asesor", "etapa_debil": "Manejar objeciones", "objetivo_ventas": "Mejorar mi tasa de conversión",
        "dm_lidera": "No lidero a nadie", "dm_trabajo": "Asesorar al cliente", "dm_antiguedad": "6 meses a 2 años", "dm_representa": "A veces, acompañado",

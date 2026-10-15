@@ -18,13 +18,13 @@ from .security import NOMBRES_ROL
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "web" / "templates"))
 
 NAV = {
-    "colaborador": [("/hoy", "Hoy", "home"), ("/roadmaps", "Mis planes", "map"), ("/catalogo", "Entrenar", "spark"), ("/mi-diagnostico", "Mi diagnóstico", "user"),
+    "colaborador": [("/hoy", "Hoy", "home"), ("/roadmaps", "Mis planes", "map"), ("/socrates", "Sócrates", "book"), ("/catalogo", "Entrenar", "spark"), ("/mi-diagnostico", "Mi diagnóstico", "user"),
                     ("/historial", "Historial", "clock"), ("/autoevaluacion", "Autoevaluación", "check")],
     "director": [("/equipo", "Mi equipo", "team"), ("/metas", "Metas", "target"), ("/analista", "Analista", "brain"), ("/analisis", "Análisis", "doc")],
     "rrhh": [("/rrhh", "Organización", "chart"), ("/gestion", "Áreas y personas", "team"), ("/aprobaciones", "Aprobaciones", "check"), ("/metas", "Metas", "target"),
-             ("/analista", "Analista", "brain"), ("/analisis", "Análisis", "doc"), ("/evaluaciones", "Evaluaciones", "star")],
+             ("/analista", "Analista", "brain"), ("/analisis", "Análisis", "doc"), ("/evaluaciones", "Evaluaciones", "star"), ("/estandares", "Estándares", "settings"), ("/encuestas", "Experiencia", "star")],
     "dg": [("/direccion", "Dirección", "chart"), ("/analista", "Analista", "brain"), ("/analisis", "Análisis", "doc")],
-    "superadmin": [("/admin", "Plataforma", "settings"), ("/admin/uso", "Uso de IA", "chart"), ("/admin/bitacora", "Bitácora", "doc")],
+    "superadmin": [("/admin", "Plataforma", "settings"), ("/admin/encuestas", "Encuestas", "star"), ("/admin/uso", "Uso de IA", "chart"), ("/admin/bitacora", "Bitácora", "doc")],
 }
 
 

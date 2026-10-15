@@ -13,6 +13,7 @@ import json
 
 from . import catalogo as C
 from . import esquemas as E
+from . import estandares as ES
 from . import prompts as P
 
 AVATARES = {
@@ -28,17 +29,24 @@ AVATARES = {
 
 
 def _texto_perfil(usuario: dict, onboarding: dict, diagnostico: dict | None = None, incluir_ventas: bool = True) -> str:
-    lineas = [f"Nombre: {usuario['nombre']}. Puesto: {usuario.get('puesto') or 'no indicado'}. Área: {usuario.get('area_nombre') or 'no indicada'}."]
+    lineas = [f"Nombre: {usuario['nombre']}. Puesto/ocupación: {usuario.get('puesto') or 'no indicado'}. Área: {usuario.get('area_nombre') or 'no indicada'}."]
     if onboarding:
         rol = ", ".join(onboarding.get("funciones") or []) or "no indicado"
-        lineas.append(f"Funciones: {rol}. Industria de sus clientes: {onboarding.get('industria', '')}. Experiencia: {onboarding.get('experiencia', '')}.")
+        ctx = onboarding.get("contexto", "")
+        if ctx:
+            lineas.append(f"Situación de vida: {ctx}. " + {"Tengo mi negocio u oficio": "Es independiente: sus 'clientes' son personas o negocios que lo contratan directamente; no hay jefes, áreas ni corporativo.",
+                                                          "Estudio": "Es estudiante: sus situaciones vienen de la escuela, proyectos, servicio social, trabajos de medio tiempo y su futuro empleo.",
+                                                          "Me dedico al hogar y la familia": "Se dedica al hogar: sus situaciones vienen de la familia, la comunidad, la escuela de los hijos, trámites y negociaciones cotidianas.",
+                                                          "Estoy buscando empleo": "Busca empleo: sus situaciones vienen de trabajos anteriores, entrevistas y su red de contactos."}.get(ctx, "Trabaja en una organización con equipos, clientes y jefes."))
+        lineas.append(f"Lo que hace en su día a día: {rol}. Con quién trata: {onboarding.get('industria', '')}. Experiencia: {onboarding.get('experiencia', '')}.")
         if incluir_ventas and onboarding.get("tipo_producto"):
             lineas.append(f"Vende: {onboarding.get('tipo_producto')} · a {onboarding.get('modelo_venta')} · canal {onboarding.get('canal_venta')} · "
                           f"clientes {onboarding.get('tamano_cliente')} · ticket {onboarding.get('ticket')} · estilo {onboarding.get('estilo')} · "
                           f"etapa débil: {onboarding.get('etapa_debil')} · objetivo: {onboarding.get('objetivo_ventas')}.")
-        lineas.append(f"Ruta DM: lidera → {onboarding.get('dm_lidera', '')}; trabajo → {onboarding.get('dm_trabajo', '')}; antigüedad → "
-                      f"{onboarding.get('dm_antiguedad', '')}; representa a la empresa → {onboarding.get('dm_representa', '')}. "
-                      f"Tiempo semanal: {onboarding.get('tiempo_semana', '')}. Meta: {onboarding.get('meta', '')}.")
+        if onboarding.get("dm_trabajo") or onboarding.get("dm_lidera"):
+            lineas.append(f"Ruta DM: lidera → {onboarding.get('dm_lidera', '')}; trabajo → {onboarding.get('dm_trabajo', '')}; antigüedad → "
+                          f"{onboarding.get('dm_antiguedad', '')}; representa a la empresa → {onboarding.get('dm_representa', '')}.")
+        lineas.append(f"Tiempo semanal: {onboarding.get('tiempo_semana', '')}. Meta: {onboarding.get('meta', '')}.")
     if diagnostico:
         lineas.append(f"Estilo de comunicación observado: {diagnostico.get('estilo_comunicacion', '')}. "
                       f"Fortalezas: {'; '.join(f['habilidad'] for f in diagnostico.get('fortalezas', []))}. "
@@ -75,7 +83,7 @@ class Elena:
                                        industria=ob.get("industria", "no indicada"),
                                        competencias_foco=", ".join(esc.get("competencias_foco") or ["Comunicación", "Resolución de problemas", "Trabajo en equipo", "Orientación a resultados"]),
                                        objetivo=sesion.get("objetivo") or "practicar historias STAR completas",
-                                       turnos_objetivo=C.turnos_max("entrevistas", nivel))
+                                       turnos_objetivo=C.turnos_max("entrevistas", nivel), estandar=ES.bloque(sesion.get("empresa_id"), "entrevistas"))
 
     @staticmethod
     def schema_para(sesion: dict) -> dict:
@@ -91,8 +99,8 @@ class Elena:
     def prompt_feedback(sesion: dict) -> tuple[str, dict]:
         hab = C.HABILIDADES["entrevistas"]
         nivel = sesion.get("nivel") or "Principiante"
-        return (P.FEEDBACK_ENTREVISTAS.format(kpis=_kpis_texto(hab, nivel), nivel=nivel, objetivo=sesion.get("objetivo") or "—", reglas=P.REGLAS_FEEDBACK),
-                E.FEEDBACK_ENTREVISTAS)
+        return (P.FEEDBACK_ENTREVISTAS.format(kpis=_kpis_texto(hab, nivel), nivel=nivel, objetivo=sesion.get("objetivo") or "—", reglas=P.REGLAS_FEEDBACK,
+                                              estandar=ES.bloque(sesion.get("empresa_id"), "entrevistas")), E.FEEDBACK_ENTREVISTAS)
 
     @staticmethod
     def score(resultado: dict, sesion: dict) -> float:
@@ -116,7 +124,8 @@ class Celeste:
                     f"Producto concreto de esta sesión: {(sesion.get('escenario') or {}).get('producto') or 'el que el vendedor presente; pregúntale qué ofrece si no queda claro'}.")
         return P.CELESTE.format(personaje=P.personaje_celeste(ob), nivel=nivel, config_nivel=P.CELESTE_NIVELES.get(nivel, P.CELESTE_NIVELES["Principiante"]),
                                 objeciones="\n".join(P.CELESTE_OBJECIONES.get(nivel, P.CELESTE_OBJECIONES["Principiante"])), contexto=contexto,
-                                canal=ob.get("canal_venta", "cara a cara"), objetivo=sesion.get("objetivo") or "ejecutar el ciclo completo")
+                                canal=ob.get("canal_venta", "cara a cara"), objetivo=sesion.get("objetivo") or "ejecutar el ciclo completo",
+                                estandar=ES.bloque(sesion.get("empresa_id"), "ventas"))
 
     @staticmethod
     def schema_para(sesion: dict) -> dict:
@@ -132,7 +141,8 @@ class Celeste:
         nivel = sesion.get("nivel") or "Principiante"
         esc = sesion.get("escenario") or {}
         return (P.FEEDBACK_VENTAS.format(kpis=_kpis_texto(hab, nivel), nivel=nivel, objetivo=sesion.get("objetivo") or "—",
-                                         etapa_debil=esc.get("etapa_debil") or "no declarada", reglas=P.REGLAS_FEEDBACK), E.FEEDBACK_VENTAS)
+                                         etapa_debil=esc.get("etapa_debil") or "no declarada", reglas=P.REGLAS_FEEDBACK,
+                                         estandar=ES.bloque(sesion.get("empresa_id"), "ventas")), E.FEEDBACK_VENTAS)
 
     @staticmethod
     def score(resultado: dict, sesion: dict) -> float:
@@ -164,7 +174,7 @@ class Juan:
         sig = C.nivel_dm_siguiente(sesion.get("nivel") or "DM Básico") or sesion.get("nivel")
         return P.JUAN_SESION.format(formato=esc.get("formato", "roleplay"), personaje=esc.get("personaje") or "—", titulo=esc.get("titulo", "Sesión"),
                                     competencia=sesion.get("competencia") or "", nivel_siguiente=sig, situacion=esc.get("situacion", ""),
-                                    subdimensiones=", ".join(esc.get("subdimensiones") or []))
+                                    subdimensiones=", ".join(esc.get("subdimensiones") or []), estandar=ES.bloque(sesion.get("empresa_id"), None))
 
     @staticmethod
     def schema_para(sesion: dict) -> dict:
@@ -183,7 +193,7 @@ class Juan:
         return (P.FEEDBACK_DM.format(titulo=esc.get("titulo", "Sesión"), formato=esc.get("formato", "roleplay"), competencia=sesion.get("competencia") or "",
                                      nivel_siguiente=sig, valor_siguiente=C.valor_dm(sig), nivel_actual=nivel_actual,
                                      subdimensiones=", ".join(esc.get("subdimensiones") or []), competencias_siguiente=", ".join(C.competencias_dm(sig)),
-                                     reglas=P.REGLAS_FEEDBACK), E.FEEDBACK_DM)
+                                     reglas=P.REGLAS_FEEDBACK, estandar=ES.bloque(sesion.get("empresa_id"), None)), E.FEEDBACK_DM)
 
     @staticmethod
     def score(resultado: dict, sesion: dict) -> float:
