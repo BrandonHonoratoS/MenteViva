@@ -65,7 +65,7 @@ async def seguridad(request: Request, call_next):
     resp.headers["Permissions-Policy"] = "camera=(self), microphone=(self), geolocation=()"
     resp.headers["Content-Security-Policy"] = ("default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com 'unsafe-inline'; "
                                                "style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; "
-                                               "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
+                                               "img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
     if settings.APP_ENV == "production":
         resp.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return resp

@@ -22,7 +22,7 @@ from . import prompts as P
 from . import validar as V
 
 AUDIO_MIMES = {"audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/wav", "audio/x-wav", "audio/aac", "audio/m4a", "audio/x-m4a", "audio/mp3", "video/webm", "video/mp4"}
-IMAGEN_MIMES = {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}
+IMAGEN_MIMES = {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "image/avif"}
 AUDIO_MAX_BYTES = 20 * 1024 * 1024
 IMAGEN_MAX_BYTES = 8 * 1024 * 1024
 AUDIO_MAX_SEG = 420   # 7 minutos (la simulación integral del programa dura 5 + 2 de preguntas)
@@ -97,12 +97,29 @@ def transcribir_audio(usuario: dict, sesion: dict, data: bytes, mime: str, durac
     return a
 
 
-def describir_foto(usuario: dict, sesion: dict, data: bytes, mime: str) -> dict:
+def _mime_imagen(data: bytes, mime: str, nombre: str = "") -> str:
+    """Tipo real de la imagen: por la firma de los bytes (algunos navegadores mandan HEIC/JPG como application/octet-stream o vacío)."""
+    if data[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    if data[4:8] == b"ftyp" and data[8:12] in (b"heic", b"heix", b"hevc", b"heim", b"heis", b"mif1", b"msf1", b"avif"):
+        return "image/avif" if data[8:12] == b"avif" else "image/heic"
+    m = (mime or "").split(";")[0].strip().lower()
+    if m in IMAGEN_MIMES:
+        return m
+    ext = (nombre or "").lower().rsplit(".", 1)[-1]
+    return {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp", "heic": "image/heic", "heif": "image/heif"}.get(ext, m)
+
+
+def describir_foto(usuario: dict, sesion: dict, data: bytes, mime: str, nombre: str = "") -> dict:
     if not data or len(data) > IMAGEN_MAX_BYTES:
         raise ValueError("La imagen está vacía o pesa más de 8 MB.")
-    m = (mime or "").split(";")[0].strip().lower()
+    m = _mime_imagen(data, mime, nombre)
     if m not in IMAGEN_MIMES:
-        raise ValueError("Formato de imagen no soportado (JPG, PNG o WEBP).")
+        raise ValueError("Formato de imagen no soportado: usa una foto JPG, PNG, WEBP o HEIC (iPhone).")
     esc = sesion.get("escenario") or {}
     contexto = f"de la situación «{esc.get('titulo', 'práctica')}»: {esc.get('situacion', '')[:300]}"
     r = llm.generar(origen="foto.describir", system=P.FOTO_DESCRIBIR.format(contexto=contexto), contents=[{"role": "user", "text": "Describe la vestimenta de esta imagen.", "inline": [{"mime": m, "data": data}]}],

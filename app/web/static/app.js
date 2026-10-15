@@ -191,7 +191,13 @@
           c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
           c.toBlob(blob => { const form = new FormData(); form.append('archivo', blob, 'outfit.jpg'); form.append('comentario', ta.value.trim()); ta.value = ''; subirAdjunto('/api/sesiones/' + id + '/foto', form, '📷 Foto enviada (analizando la vestimenta…)'); foto.value = ''; }, 'image/jpeg', 0.86);
         };
-        img.onerror = () => { toast('No se pudo leer la imagen.'); foto.value = ''; };
+        img.onerror = () => {
+          // el navegador no puede mostrarla (p. ej. HEIC de iPhone en Windows): se envía el archivo original y el servidor la analiza
+          URL.revokeObjectURL(url);
+          if (f.size > 8 * 1024 * 1024) { toast('La foto pesa más de 8 MB. Toma una captura de pantalla de la foto y envía esa.'); foto.value = ''; return; }
+          const form = new FormData(); form.append('archivo', f, f.name || 'outfit'); form.append('comentario', ta.value.trim()); ta.value = '';
+          subirAdjunto('/api/sesiones/' + id + '/foto', form, '📷 Foto enviada (analizando la vestimenta…)'); foto.value = '';
+        };
         img.src = url;
       };
     }

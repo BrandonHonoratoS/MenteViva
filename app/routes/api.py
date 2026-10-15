@@ -115,7 +115,7 @@ async def foto(sid: int, request: Request, u: dict = Depends(requiere_usuario), 
     from ..agents import adjuntos as AD
     data = await archivo.read()
     try:
-        f = AD.describir_foto(db.usuario(u["id"]), s, data, archivo.content_type or "")
+        f = AD.describir_foto(db.usuario(u["id"]), s, data, archivo.content_type or "", archivo.filename or "")
     except ValueError as e:
         raise HTTPException(400, str(e))
     except PresupuestoAgotado as e:
