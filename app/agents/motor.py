@@ -272,7 +272,10 @@ def _contenidos(sesion: dict, mensajes: list[dict], pista_apertura: str | None =
         nota = nota_adjunto(m.get("meta")) if m["rol"] == "usuario" else ""
         contents.append({"role": "user" if m["rol"] == "usuario" else "model", "text": (nota + "\n" if nota else "") + m["texto"]})
     if pista_apertura:
-        contents.append({"role": "user", "text": pista_apertura})
+        if contents and contents[-1]["role"] == "user":
+            contents[-1] = {**contents[-1], "text": contents[-1]["text"] + "\n" + pista_apertura}
+        else:
+            contents.append({"role": "user", "text": pista_apertura})
     if not contents or contents[0]["role"] != "user":
         contents.insert(0, {"role": "user", "text": "(inicio de la conversación)"})
     return contents
@@ -344,10 +347,36 @@ def turno(sesion: dict, usuario: dict, texto: str, meta_usuario: dict | None = N
             resp["estado"] = "fin"
             return resp
         resp = _generar_turno(sesion, usuario, perfil)
+        resp = _evitar_cierre_prematuro(sesion, usuario, perfil, resp)
         _quiza_resumir(sesion, usuario)
         return resp
     finally:
         lk.release()
+
+
+def _evitar_cierre_prematuro(sesion: dict, usuario: dict, perfil: dict, resp: dict) -> dict:
+    """Si el avatar quiere cerrar antes del mínimo de intercambios (y la persona no pidió Fin), se descarta ese turno y se pide uno que avance la escena."""
+    agente = agente_para(sesion["habilidad"])
+    if sesion["tipo"] != "practica" or not es_generico(agente) or resp.get("estado") != "fin":
+        return resp
+    sesion = db.sesion(sesion["id"])
+    minimo = C.turnos_minimos(sesion["habilidad"], sesion.get("nivel"))
+    if int(sesion.get("turnos") or 0) >= minimo:
+        return resp
+    ultimo = [m for m in db.mensajes(sesion["id"]) if m["rol"] == "avatar"][-1]
+    with db.conn() as con:
+        con.execute("DELETE FROM mensajes WHERE id=?", (ultimo["id"],))
+    pista = (f"[sistema: NO cierres todavía: van {sesion['turnos']} de unos {C.turnos_max(sesion['habilidad'], sesion.get('nivel'))} intercambios. "
+             "Reconoce brevemente lo que la persona acaba de resolver dentro de la escena y haz avanzar la situación al SIGUIENTE momento con un reto nuevo "
+             "(otro personaje, un dilema, una complicación). Marca estado en_curso.]")
+    nuevo = _generar_turno(sesion, usuario, perfil, pista, origen_extra="turno_continuar")
+    if nuevo.get("estado") == "fin":
+        nuevo["estado"] = "en_curso"
+        with db.conn() as con:
+            con.execute("UPDATE mensajes SET meta_json=? WHERE id=(SELECT MAX(id) FROM mensajes WHERE sesion_id=? AND rol='avatar')",
+                        (json_compacto({k: v for k, v in nuevo.items() if k != "texto"}), sesion["id"]))
+    db.log("info", "sesion", f"Sesión {sesion['id']}: el avatar intentó cerrar en el intercambio {sesion['turnos']}; se continuó la escena", "")
+    return nuevo
 
 
 def _resumen_voz(previo: dict | None, a: dict) -> dict:

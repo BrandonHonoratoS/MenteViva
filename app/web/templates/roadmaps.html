@@ -1,14 +1,49 @@
 {% extends "base.html" %}{% block title %}Mis planes{% endblock %}
-{% block subtitulo %}Roadmaps diseñados por Elena y recalculados por el Analista después de cada sesión{% endblock %}
+{% block subtitulo %}Tu plan integral: todas tus habilidades, intercaladas semana a semana hacia tu meta{% endblock %}
 {% block content %}
 {% if perfil.estado != 'completo' %}<div class="card hero"><h2>Primero tu diagnóstico</h2><p class="muted">Elena diseña tus planes al terminar la entrevista.</p><a class="btn primary mt" href="/diagnostico">Ir al diagnóstico</a></div>
 {% elif not roadmaps %}<div class="card hero"><h2>Aún no hay planes</h2><p class="muted">Si Elena ya te diagnosticó, genera tus planes aquí (la IA pudo estar saturada al cerrar la entrevista).</p>
 <form method="post" action="/diagnostico/planes"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn primary mt" type="submit">Generar mis planes ahora</button></form></div>{% endif %}
+{% if plan and roadmaps %}
+{% if plan.faltan %}<div class="alert warn mb" style="margin-bottom:18px"><div class="row between"><div><b>Tu plan aún no incluye {{ plan.faltan|length }} habilidad{{ 'es' if plan.faltan|length > 1 else '' }}:</b> {% for h in plan.faltan %}{{ HABILIDADES[h].nombre }}{{ ', ' if not loop.last else '' }}{% endfor %}. Elena las integra a tu calendario (recibe tus sesiones pendientes de nuevo, sin perder tu avance).</div>
+<form method="post" action="/diagnostico/planes"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn primary sm" type="submit">Integrarlas a mi plan</button></form></div></div>{% endif %}
+<div class="card hero mb" style="margin-bottom:18px">
+  <div class="row between">
+    <div><div class="cap">Tu plan integral</div><h2 style="margin:4px 0">{{ plan.meta or 'Desarrollar tus habilidades blandas' }}</h2>
+      <div class="muted small">{{ plan.habilidades|length }} habilidades · {{ plan.total }} sesiones · {{ plan.ultima_semana }} semanas · {{ plan.sesiones_semana }} {{ 'sesiones' if plan.sesiones_semana > 1 else 'sesión' }} por semana{% if plan.tiempo_semana %} ({{ plan.tiempo_semana }} declarados){% endif %}</div></div>
+    <div class="stat" style="align-items:flex-end"><span class="v">{{ plan.completadas }}<small>/{{ plan.total }}</small></span><span class="l">sesiones</span></div>
+  </div>
+  <div class="bar mt"><i style="width:{{ (plan.completadas / plan.total * 100) if plan.total else 0 }}%"></i></div>
+  <div class="row mt" style="flex-wrap:wrap;gap:6px">{% for h in plan.habilidades %}<span class="chip">{{ HABILIDADES[h].nombre }}</span>{% endfor %}</div>
+  {% if plan.metas_lider %}<div class="cap mt">Metas de tu líder</div><ul class="small" style="margin:4px 0 0 18px">{% for m in plan.metas_lider %}<li>{{ m }}</li>{% endfor %}</ul>{% endif %}
+  <p class="small muted mt">Elena reparte más sesiones a donde vio más brecha y alterna habilidades para que ninguna se quede semanas sin práctica. El Analista reacomoda el calendario después de cada sesión.</p>
+</div>
+<div class="card mb" style="margin-bottom:18px">
+  <div class="row between"><h2 style="margin:0">Semana a semana</h2>{% if plan.semana_actual %}<span class="chip mint">Vas en la semana {{ plan.semana_actual }}</span>{% endif %}</div>
+  {% set ps = namespace(next=false) %}
+  {% for sem, its in plan.semanas %}
+  <details class="mt" {{ 'open' if sem == plan.semana_actual or (plan.semana_actual and sem == plan.semana_actual + 1) else '' }}>
+    <summary><b>Semana {{ sem }}</b> <span class="muted small">· {{ its|selectattr('estado','equalto','completada')|list|length }}/{{ its|length }} hechas · {% for h in its|map(attribute='habilidad')|unique %}{{ HABILIDADES[h].corto or HABILIDADES[h].nombre }}{{ ', ' if not loop.last else '' }}{% endfor %}</span></summary>
+    <div class="timeline mt">
+    {% for it in its %}
+      {% set es_next = (not ps.next and sem == plan.semana_actual and it.estado == 'pendiente' and it.roadmap_estado == 'activo') %}{% if es_next %}{% set ps.next = true %}{% endif %}
+      <div class="tl-item {{ 'done' if it.estado == 'completada' else '' }} {{ 'lab' if it.tipo == 'laboratorio' else '' }} {{ 'next' if es_next else '' }}">
+        <div class="row between"><span class="chip">{{ HABILIDADES[it.habilidad].nombre }} · {{ it.nivel }}{% if it.competencia %} · {{ it.competencia }}{% endif %}{% if it.roadmap_estado == 'propuesto' %} · pendiente de aprobación{% endif %}</span>
+        {% if it.estado == 'completada' and it.sesion_id %}<a class="btn sm" href="/sesion/{{ it.sesion_id }}/reporte">Ver reporte</a>{% elif it.estado == 'pendiente' and it.roadmap_estado == 'activo' and not en_curso and sem == plan.semana_actual %}<a class="btn {{ 'primary' if es_next else '' }} sm" href="{{ '/laboratorio?item=' ~ it.id if it.tipo == 'laboratorio' else '/entrenar/' ~ it.habilidad ~ '?item=' ~ it.id }}">{{ 'Laboratorio' if it.tipo == 'laboratorio' else 'Entrenar' }}</a>{% endif %}</div>
+        <div style="margin-top:6px"><b>{{ it.objetivo }}</b></div>
+      </div>
+    {% endfor %}
+    </div>
+  </details>
+  {% endfor %}
+</div>
+<h2 style="margin:6px 0 12px">Detalle por habilidad</h2>
+{% endif %}
 {% for r in roadmaps %}
 {% set hab = HABILIDADES[r.habilidad] %}{% set av = AVATARES[hab.agente] %}
 <div class="card mb" style="margin-bottom:18px">
   <div class="row between">
-    <div class="row"><div class="orb sm" style="--c1:{{ av.color }};--c2:#06B6D4"></div><div><h2 style="margin:0">{{ hab.nombre }} <span class="chip {{ {'activo':'mint','propuesto':'amber','pausado':'gris','completado':'aqua','rechazado':'rose'}[r.estado] }}">{{ r.estado }}</span></h2><div class="muted small">con {{ av.nombre }} · desde nivel {{ r.nivel_inicio }} · {{ r.horizonte_semanas }} semanas · {{ r.sesiones_semana }}/semana · versión {{ r.version }}{% if r.ajustes %} · {{ r.ajustes }} ajustes del Analista{% endif %}</div></div></div>
+    <div class="row"><div class="orb sm" style="--c1:{{ av.color }};--c2:#06B6D4"></div><div><h2 style="margin:0">{{ hab.nombre }} <span class="chip {{ {'activo':'mint','propuesto':'amber','pausado':'gris','completado':'aqua','rechazado':'rose'}[r.estado] }}">{{ r.estado }}</span></h2><div class="muted small">con {{ av.nombre }} · desde nivel {{ r.nivel_inicio }} · {{ r.total }} sesiones dentro de tu plan integral · versión {{ r.version }}{% if r.ajustes %} · {{ r.ajustes }} ajustes del Analista{% endif %}</div></div></div>
     <div class="stat" style="align-items:flex-end"><span class="v">{{ r.completadas }}<small>/{{ r.total }}</small></span><span class="l">sesiones</span></div>
   </div>
   <div class="bar mt"><i style="width:{{ (r.completadas / r.total * 100) if r.total else 0 }}%"></i></div>

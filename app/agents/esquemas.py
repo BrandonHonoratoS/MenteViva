@@ -160,6 +160,7 @@ DISENO_GENERICO = _obj({
     "titulo": _s(), "encuadre": _s("2-3 líneas para la persona"), "personaje": _s("nombre y rol que interpreta el avatar"),
     "situacion": _s("contexto que verá la persona"), "primer_mensaje": _s("primer turno del avatar ya dentro de la escena"),
     "tarea": _s("qué debe hacer la persona en la sesión (p. ej. grabar su apertura de 30 s y luego una presentación de 3 min)"),
+    "momentos": _arr(_s("un momento de la escena: qué pasa y qué debe resolver la persona"), 3, 5),
     "duracion_objetivo_s": _i(0, 600, "segundos que debe durar la grabación principal; 0 si no aplica"),
     "dificultad_inicial": _i(1, 5),
 })

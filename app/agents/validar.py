@@ -312,6 +312,7 @@ def diseno_generico(js: dict | None, sesion: dict) -> dict:
             "encuadre": _texto(js.get("encuadre"), f"Hoy practicas {hab['nombre'].lower()} en una situación de tu vida real."),
             "personaje": _texto(js.get("personaje"), hab["avatar"])[:200], "situacion": _texto(js.get("situacion"), "Situación de tu contexto.")[:1500],
             "primer_mensaje": _texto(js.get("primer_mensaje"))[:1500], "tarea": _texto(js.get("tarea"))[:600],
+            "momentos": [str(m).strip()[:300] for m in _lista(js.get("momentos")) if str(m).strip()][:5],
             "duracion_objetivo_s": int(_num(js.get("duracion_objetivo_s"), 0, 600, default=0)), "dificultad_inicial": int(_num(js.get("dificultad_inicial"), 1, 5, default=2))}
 
 

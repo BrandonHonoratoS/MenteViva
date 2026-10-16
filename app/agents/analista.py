@@ -133,6 +133,11 @@ def post_sesion(sesion: dict, usuario: dict) -> None:
     else:
         _aplicar_siguiente_objetivo(usuario, sesion, (resultado.get("recomendacion") or {}).get("objetivo_siguiente"))
     _completar_roadmap_si_termino(usuario, sesion["habilidad"])
+    try:   # plan integral: refuerzos, checkpoints y roadmaps nuevos se reacomodan en el mismo calendario semanal
+        from .roadmap import reprogramar_plan_integral
+        reprogramar_plan_integral(usuario)
+    except Exception as e:  # noqa: BLE001
+        log.warning("no se pudo reprogramar el plan integral: %s", e)
 
 
 def _narrativa_post_sesion(sesion, usuario, hab, scores, nivel_actual, nuevo_nivel, decisiones, resultado) -> dict | None:

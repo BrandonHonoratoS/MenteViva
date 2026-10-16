@@ -50,27 +50,22 @@ def analizar_diagnostico(sesion: dict, usuario: dict, transcript: str) -> None:
         if not db.nivel(usuario["id"], hid):
             db.guardar_nivel(usuario["id"], hid, _nivel_inicial(hid, diag, ob), diag["score_inicial"], "diagnóstico de Elena")
 
-    # roadmaps: uno por habilidad que a la persona le sirve (su contexto/rol o brecha alta/media según Elena); la Ruta DM sólo para gente de empresa
+    # PLAN INTEGRAL: un roadmap por cada habilidad que a la persona le sirve (todas las de su empresa si trabaja en una; las de su vida real si es
+    # público general), con más sesiones donde Elena vio más brecha, y todas intercaladas semana a semana en un solo plan hacia su meta.
     usa = C.habilidades_que_usa(ob)
-    relevantes = {h["id"] for h in C.habilidades_relevantes(ob, diag, habs)[0]}
-    prioridades = [p for p in diag.get("prioridades", []) if p.get("habilidad_id") in ids and p["habilidad_id"] in relevantes]
-    orden = [p["habilidad_id"] for p in prioridades]
-    if "ruta_dm" in relevantes and "ruta_dm" not in orden:
-        orden.append("ruta_dm")
-    if not C.es_contexto_empresa(ob):   # público general: el núcleo de su vida real lleva plan aunque Elena no lo listara
-        for hid in C.habilidades_nucleo(ob) & relevantes:
-            if hid not in orden:
-                orden.append(hid)
+    orden = _orden_plan(ob, diag, habs)
+    brechas = _brechas(diag, orden)
     spw_total = C.sesiones_por_semana(ob.get("tiempo_semana", ""))
+    cantidades = _cantidades(brechas, spw_total)
     creados = []
-    for i, hid in enumerate(orden):
-        brecha = next((p.get("brecha") for p in prioridades if p["habilidad_id"] == hid), "media")
-        spw = max(1, spw_total // max(1, len(orden)) + (1 if i < spw_total % max(1, len(orden)) else 0))
+    for hid in orden:
         try:
-            rid = generar_roadmap(usuario, hid, brecha=brecha, sesiones_semana=spw, requiere_aprobacion=hid not in usa, diagnostico=diag)
+            rid = generar_roadmap(usuario, hid, brecha=brechas[hid], sesiones_semana=spw_total, requiere_aprobacion=hid not in usa, diagnostico=diag,
+                                  n_items=cantidades[hid], reprogramar=False)
             creados.append((hid, rid))
         except (PresupuestoAgotado, ErrorLLM) as e:
             db.log("warn", "roadmap", f"No se pudo generar roadmap {hid} para {usuario['email']}", str(e))
+    reprogramar_plan_integral(usuario)
     db.notificar(usuario["id"], "Tu diagnóstico está listo", "Elena terminó tu análisis y diseñó tus planes de desarrollo.", "/mi-diagnostico", "exito")
     for m in _managers_de(usuario):
         db.notificar(m["id"], f"Diagnóstico completado: {usuario['nombre']}",
@@ -79,37 +74,164 @@ def analizar_diagnostico(sesion: dict, usuario: dict, transcript: str) -> None:
 
 
 def generar_roadmaps_faltantes(usuario: dict) -> list[str]:
-    """Vuelve a crear los roadmaps que no se generaron (p. ej. por un fallo transitorio de la IA tras el diagnóstico)."""
+    """Completa el plan integral: crea los roadmaps de las habilidades relevantes que aún no tienen (fallo transitorio de la IA o habilidades
+    nuevas en la plataforma) y vuelve a intercalar todo el plan semana a semana."""
     perfil = db.perfil(usuario["id"])
     diag = perfil.get("diagnostico") or {}
     if perfil.get("estado") != "completo" or not diag:
         return []
     ob = perfil.get("onboarding", {})
     habs = C.habilidades_empresa(db.empresa(usuario.get("empresa_id")))
-    ids = {h["id"] for h in habs}
     usa = C.habilidades_que_usa(ob)
-    relevantes = {h["id"] for h in C.habilidades_relevantes(ob, diag, habs)[0]}
-    prioridades = [p for p in diag.get("prioridades", []) if p.get("habilidad_id") in ids and p["habilidad_id"] in relevantes]
-    orden = [p["habilidad_id"] for p in prioridades]
-    if "ruta_dm" in relevantes and "ruta_dm" not in orden:
-        orden.append("ruta_dm")
-    if not C.es_contexto_empresa(ob):
-        for hid in C.habilidades_nucleo(ob) & relevantes:
-            if hid not in orden:
-                orden.append(hid)
-    existentes = {r["habilidad"] for r in db.roadmaps(usuario["id"], ("activo", "propuesto"))}
-    spw_total = C.sesiones_por_semana(ob.get("tiempo_semana", ""))
+    orden = _orden_plan(ob, diag, habs)
+    existentes = _con_plan(usuario)
+    brechas = _brechas(diag, orden)
+    cantidades = _cantidades(brechas, C.sesiones_por_semana(ob.get("tiempo_semana", "")))
     creados = []
-    for i, hid in enumerate(orden):
+    for hid in orden:
         if hid in existentes:
             continue
         if not db.nivel(usuario["id"], hid):
             db.guardar_nivel(usuario["id"], hid, _nivel_inicial(hid, diag, ob), diag.get("score_inicial") if hid != "ruta_dm" else None, "diagnóstico de Elena")
-        brecha = next((p.get("brecha") for p in prioridades if p["habilidad_id"] == hid), "media")
-        spw = max(1, spw_total // max(1, len(orden)) + (1 if i < spw_total % max(1, len(orden)) else 0))
-        generar_roadmap(usuario, hid, brecha=brecha, sesiones_semana=spw, requiere_aprobacion=hid not in usa, diagnostico=diag)
-        creados.append(hid)
+        try:
+            generar_roadmap(usuario, hid, brecha=brechas[hid], sesiones_semana=C.sesiones_por_semana(ob.get("tiempo_semana", "")),
+                            requiere_aprobacion=hid not in usa, diagnostico=diag, n_items=cantidades[hid], reprogramar=False,
+                            motivo="habilidad integrada a tu plan integral")
+            creados.append(hid)
+        except (PresupuestoAgotado, ErrorLLM) as e:
+            db.log("warn", "roadmap", f"No se pudo generar roadmap {hid} para {usuario['email']}", str(e))
+    reprogramar_plan_integral(usuario)
     return creados
+
+
+def habilidades_sin_plan(usuario: dict) -> list[str]:
+    """Habilidades que deberían estar en el plan integral y aún no tienen roadmap (p. ej. escenarios nuevos para quien ya hizo su diagnóstico)."""
+    perfil = db.perfil(usuario["id"])
+    if perfil.get("estado") != "completo" or not perfil.get("diagnostico"):
+        return []
+    habs = C.habilidades_empresa(db.empresa(usuario.get("empresa_id")))
+    existentes = _con_plan(usuario)
+    return [h for h in _orden_plan(perfil.get("onboarding") or {}, perfil["diagnostico"], habs) if h not in existentes]
+
+
+def _con_plan(usuario: dict) -> set[str]:
+    """Habilidades que ya tienen roadmap (vigente, pausado o completado). Un roadmap rechazado por RRHH cuenta como decidido (no se vuelve a
+    proponer), salvo que la persona se haya quedado sin ningún plan vigente: entonces se regenera todo."""
+    rs = db.roadmaps(usuario["id"], ("activo", "propuesto", "pausado", "completado", "rechazado"))
+    vigentes = any(r["estado"] in ("activo", "propuesto") for r in rs)
+    return {r["habilidad"] for r in rs if r["estado"] != "rechazado" or vigentes}
+
+
+def resumen_plan_integral(usuario: dict) -> dict:
+    """Vista del plan como UNO solo: meta, habilidades, avance total y calendario semana a semana con las sesiones de todas las habilidades."""
+    perfil = db.perfil(usuario["id"])
+    ob = perfil.get("onboarding") or {}
+    rms = [r for r in db.roadmaps(usuario["id"], ("activo", "propuesto", "completado"))]
+    metas_lider = []
+    if usuario.get("empresa_id"):
+        for m in db.metas(usuario["empresa_id"], area_id=usuario.get("area_id"), usuario_id=usuario["id"]):
+            h = C.HABILIDADES.get(m["habilidad"], {})
+            metas_lider.append(f"{h.get('nombre', m['habilidad'])}{(' · ' + m['competencia']) if m.get('competencia') else ''}: score ≥ {m['score_minimo']}"
+                               f"{(' para ' + str(m['plazo'])) if m.get('plazo') else ''}")
+    semanas: dict[int, list] = {}
+    total = hechas = 0
+    for r in rms:
+        for it in r["items"]:
+            total += 1
+            hechas += it["estado"] == "completada"
+            semanas.setdefault(int(it["semana"] or 1), []).append({**it, "habilidad": r["habilidad"], "roadmap_estado": r["estado"]})
+    for lst in semanas.values():
+        lst.sort(key=lambda i: (i["estado"] != "completada", i["habilidad"], i["orden"]))
+    pendientes = sorted(k for k, v in semanas.items() if any(i["estado"] == "pendiente" for i in v))
+    return {
+        "meta": ob.get("meta") or "", "metas_lider": metas_lider, "habilidades": [r["habilidad"] for r in rms if r["estado"] != "completado"],
+        "total": total, "completadas": hechas, "semanas": sorted(semanas.items()), "sesiones_semana": C.sesiones_por_semana(ob.get("tiempo_semana", "")),
+        "tiempo_semana": ob.get("tiempo_semana") or "", "semana_actual": pendientes[0] if pendientes else None,
+        "ultima_semana": max(semanas) if semanas else 0, "faltan": habilidades_sin_plan(usuario),
+    }
+
+
+# ── plan integral: cuántas sesiones por habilidad y en qué semana ───────────
+PESO_BRECHA = {"alta": 3, "media": 2, "baja": 1}
+MIN_SESIONES = {"alta": 4, "media": 3, "baja": 2}
+
+
+def _orden_plan(ob: dict, diag: dict, habs: list[dict]) -> list[str]:
+    """Habilidades del plan, en orden de prioridad: primero las que Elena priorizó (por brecha), luego el resto de las relevantes."""
+    relevantes = [h["id"] for h in C.habilidades_relevantes(ob, diag, habs)[0]]
+    rango = {"alta": 0, "media": 1, "baja": 2}
+    prior = sorted([p for p in diag.get("prioridades", []) if p.get("habilidad_id") in relevantes], key=lambda p: rango.get(p.get("brecha"), 1))
+    orden = [p["habilidad_id"] for p in prior]
+    for hid in relevantes:
+        if hid not in orden and not (hid == "liderazgo" and not C.lidera(ob)):   # Liderazgo entra al plan sólo si lidera (o si Elena lo priorizó)
+            orden.append(hid)
+    return orden
+
+
+def _brechas(diag: dict, hids: list[str]) -> dict[str, str]:
+    out = {}
+    for hid in hids:
+        b = next((p.get("brecha") for p in diag.get("prioridades", []) if p.get("habilidad_id") == hid), None)
+        out[hid] = b if b in PESO_BRECHA else ("media" if hid == "ruta_dm" else "baja")
+    return out
+
+
+def _cantidades(brechas: dict[str, str], sesiones_semana: int) -> dict[str, int]:
+    """Reparte el tiempo semanal declarado: más sesiones a la brecha alta, nunca menos de 2 por habilidad."""
+    if not brechas:
+        return {}
+    horizonte = 8 if "alta" in brechas.values() else 6
+    total = horizonte * max(1, sesiones_semana)
+    peso_total = sum(PESO_BRECHA[b] for b in brechas.values())
+    return {h: min(16, max(MIN_SESIONES[b], round(total * PESO_BRECHA[b] / peso_total))) for h, b in brechas.items()}
+
+
+def _intercalar(colas: dict[str, list], pesos: dict[str, int]) -> list[tuple[str, dict]]:
+    """Round-robin ponderado suave: la habilidad con más sesiones aparece más seguido, repartida a lo largo de todo el plan; empata a favor de la
+    prioridad (orden de las colas)."""
+    colas = {h: list(q) for h, q in colas.items() if q}
+    acumulado = {h: 0 for h in colas}
+    out: list[tuple[str, dict]] = []
+    while colas:
+        total = sum(pesos.get(h, 1) for h in colas)
+        for h in colas:
+            acumulado[h] += pesos.get(h, 1)
+        elegido = max(colas, key=lambda h: acumulado[h])
+        acumulado[elegido] -= total
+        out.append((elegido, colas[elegido].pop(0)))
+        if not colas[elegido]:
+            del colas[elegido]
+            del acumulado[elegido]
+    return out
+
+
+def reprogramar_plan_integral(usuario: dict) -> int:
+    """Reacomoda las sesiones pendientes de TODOS los roadmaps vigentes en un solo calendario: N sesiones por semana (el tiempo que la persona
+    declaró), intercalando habilidades según su brecha. Respeta el orden interno de cada roadmap. Devuelve cuántas sesiones cambiaron de semana."""
+    perfil = db.perfil(usuario["id"])
+    ob = perfil.get("onboarding") or {}
+    diag = perfil.get("diagnostico") or {}
+    spw = max(1, C.sesiones_por_semana(ob.get("tiempo_semana", "")))
+    rms = sorted(db.roadmaps(usuario["id"], ("activo", "propuesto")), key=lambda r: r["id"])
+    colas = {}
+    for r in rms:
+        pend = [it for it in sorted(r["items"], key=lambda i: i["orden"]) if it["estado"] == "pendiente"]
+        if pend:
+            colas.setdefault(r["habilidad"], []).extend(pend)
+    if not colas:
+        return 0
+    inicio = min(it["semana"] or 1 for q in colas.values() for it in q)
+    orden = _orden_plan(ob, diag, C.habilidades_empresa(db.empresa(usuario.get("empresa_id")))) if diag else list(colas)
+    colas = {h: colas[h] for h in sorted(colas, key=lambda h: orden.index(h) if h in orden else 99)}
+    # la brecha ya decidió CUÁNTAS sesiones lleva cada habilidad (_cantidades); aquí se reparten proporcionalmente a lo que le falta a cada una,
+    # así todas avanzan en paralelo hasta el final del plan (ninguna se termina en la semana 3 ni se queda sola al final)
+    cambios = 0
+    for k, (_h, it) in enumerate(_intercalar(colas, {h: len(q) for h, q in colas.items()})):
+        semana = inicio + k // spw
+        if int(it["semana"] or 0) != semana:
+            db.actualizar_item(it["id"], semana=semana)
+            cambios += 1
+    return cambios
 
 
 def _nivel_inicial(hid: str, diag: dict, ob: dict) -> str:
@@ -148,7 +270,8 @@ def _horizonte(brecha: str) -> int:
 
 
 def generar_roadmap(usuario: dict, habilidad_id: str, brecha: str = "media", sesiones_semana: int = 2, requiere_aprobacion: bool = False,
-                    diagnostico: dict | None = None, motivo: str = "diagnóstico inicial", agregado_por: str = "elena") -> int:
+                    diagnostico: dict | None = None, motivo: str = "diagnóstico inicial", agregado_por: str = "elena", n_items: int | None = None,
+                    reprogramar: bool = True) -> int:
     hab = C.HABILIDADES[habilidad_id]
     perfil = db.perfil(usuario["id"])
     ob = perfil.get("onboarding", {})
@@ -156,7 +279,7 @@ def generar_roadmap(usuario: dict, habilidad_id: str, brecha: str = "media", ses
     niv = db.nivel(usuario["id"], habilidad_id) or {}
     nivel = niv.get("nivel") or hab["niveles"][0]
     horizonte = _horizonte(brecha)
-    n_items = max(3, min(16, horizonte * sesiones_semana))
+    n_items = max(2, min(16, n_items)) if n_items else max(3, min(16, horizonte * sesiones_semana))
     # andamiaje
     andamiaje = []
     if habilidad_id == "ruta_dm":
@@ -204,6 +327,8 @@ def generar_roadmap(usuario: dict, habilidad_id: str, brecha: str = "media", ses
                            {"roadmap_id": rid, "habilidad": habilidad_id, "nivel": nivel, "sesiones": len(items), "horizonte": horizonte},
                            evidencia=f"La habilidad no forma parte del rol declarado ({', '.join(ob.get('funciones') or []) or 'sin funciones'}); "
                                      f"Elena la propone por brecha {brecha}.", usuario_id=usuario["id"], clave=f"roadmap:{rid}")
+    if reprogramar:
+        reprogramar_plan_integral(usuario)
     return rid
 
 

@@ -22,6 +22,7 @@
 {% if encuesta_pendiente %}<div class="card hero mb" style="margin-bottom:18px"><div class="row between"><div><span class="chip aqua">3 minutos</span><h2 style="margin-top:8px">¿Cómo fue tu primera práctica?</h2><p class="muted">Eres de las primeras personas en usar Mente Viva. Cuéntanos qué te gustó, qué cambiarías y qué valor le ves: lo que digas define lo que construimos.</p></div><a class="btn primary" href="/encuesta">Contar mi experiencia</a></div></div>{% endif %}
 <div class="grid g-2-1">
   <div class="stack">
+    {% if plan_faltan %}<div class="alert warn mb" style="margin-bottom:14px"><div class="row between"><span>Tu plan integral aún no incluye: {% for h in plan_faltan %}{{ HABILIDADES[h].nombre }}{{ ', ' if not loop.last else '' }}{% endfor %}.</span><a class="btn sm" href="/roadmaps">Integrarlas a mi plan</a></div></div>{% endif %}
     {% if en_curso %}
     {% include "_en_curso.html" %}
     {% elif siguiente %}

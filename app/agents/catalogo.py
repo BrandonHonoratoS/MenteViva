@@ -456,6 +456,11 @@ def turnos_max(habilidad_id: str, nivel: str | None) -> int:
     return int(t.get(nivel or "", t.get("*", 22)))
 
 
+def turnos_minimos(habilidad_id: str, nivel: str | None) -> int:
+    """Antes de este intercambio el avatar no puede cerrar por su cuenta (la persona sí, escribiendo Fin)."""
+    return max(6, (turnos_max(habilidad_id, nivel) * 6 + 9) // 10)
+
+
 def duracion_min(habilidad_id: str, nivel: str | None) -> int:
     h = HABILIDADES.get(habilidad_id) or {}
     d = h.get("duracion", {})

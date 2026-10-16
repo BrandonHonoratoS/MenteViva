@@ -252,7 +252,7 @@ class Generico:
             est = (sesion.get("escenario") or {}).get("estilo_test") or {}
             if est.get("predominante"):
                 extra = f" Estilo de liderazgo según el test (grid gerencial): {est['predominante']} — {est.get('lectura', '')}. Diseña una escena que lo rete a flexibilizar hacia el estilo situacional."
-        return (P.GENERICO_DISENO.format(identidad=self.cfg["identidad"], base=self._base(), tipos=self.cfg["tipos"], nivel=nivel,
+        return (P.GENERICO_DISENO.format(identidad=self.cfg["identidad"], base=self._base(), tipos=self.cfg["tipos"], nivel=nivel, turnos=C.turnos_max(self.habilidad_id, nivel),
                                          config_nivel=self.cfg["niveles"].get(nivel, ""), perfil=_texto_perfil(usuario, perfil.get("onboarding", {}), perfil.get("diagnostico"), incluir_ventas=self.habilidad_id in ("imagen", "presentaciones")) + extra,
                                          objetivo=sesion.get("objetivo") or f"practicar {self.hab['nombre'].lower()} en una situación real", historial=hist,
                                          estandar=ES.bloque(sesion.get("empresa_id"), self.habilidad_id)), E.DISENO_GENERICO)
@@ -263,7 +263,9 @@ class Generico:
         return P.GENERICO_SESION.format(identidad=self.cfg["identidad"], reglas=self.cfg["reglas"], nivel=nivel, config_nivel=self.cfg["niveles"].get(nivel, ""),
                                         titulo=esc.get("titulo", "Práctica"), personaje=esc.get("personaje") or self.hab["avatar"], situacion=esc.get("situacion", ""),
                                         tarea=esc.get("tarea") or "conversar la situación hasta resolverla", estandar=ES.bloque(sesion.get("empresa_id"), self.habilidad_id),
-                                        objetivo=sesion.get("objetivo") or "—")
+                                        objetivo=sesion.get("objetivo") or "—",
+                                        momentos=" → ".join(f"({i}) {m}" for i, m in enumerate(esc.get("momentos") or [], start=1)) or "inicio de la escena → el reto principal → una complicación → el cierre con acuerdos",
+                                        turno=int(sesion.get("turnos") or 0) + 1, turnos_max=C.turnos_max(self.habilidad_id, nivel), turno_min=C.turnos_minimos(self.habilidad_id, nivel))
 
     def schema_para(self, sesion: dict) -> dict:
         return E.TURNO_GENERICO

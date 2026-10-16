@@ -140,11 +140,15 @@ def decidir(request: Request, pid: int, u: dict = Depends(rrhh), csrf: str = For
             rid = (p.get("detalle") or {}).get("roadmap_id")
             if rid:
                 db.actualizar_roadmap(rid, estado="activo", aprobado_por=u["id"])
+                from ..agents.roadmap import reprogramar_plan_integral
+                reprogramar_plan_integral(db.usuario(p["usuario_id"]))
                 db.notificar(p["usuario_id"], "RRHH aprobó tu plan", f"Tu plan de {C.HABILIDADES.get((p.get('detalle') or {}).get('habilidad', ''), {}).get('nombre', '')} ya está activo.", "/roadmaps", "exito")
     elif decision == "rechazada" and p["tipo"] == "roadmap":
         rid = (p.get("detalle") or {}).get("roadmap_id")
         if rid:
             db.actualizar_roadmap(rid, estado="rechazado")
+            from ..agents.roadmap import reprogramar_plan_integral
+            reprogramar_plan_integral(db.usuario(p["usuario_id"]))
     if p.get("usuario_id") and p["tipo"] in ("ascenso_dm",) and decision == "rechazada":
         db.notificar(p["usuario_id"], "Ascenso en revisión", "RRHH decidió esperar; sigue entrenando las competencias del siguiente nivel.", "/roadmaps", "aviso")
     db.log("info", "aprobaciones", f"Propuesta #{pid} {decision}", p["titulo"], u["email"])

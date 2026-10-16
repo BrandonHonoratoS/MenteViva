@@ -43,13 +43,15 @@ def hoy(request: Request, u: dict = Depends(colab)):
         lec = db.leccion_por_tema(u["id"], siguiente["habilidad"], siguiente["tema_socrates"])
         siguiente["leccion"] = lec if lec and lec["estado"] == "lista" else None
     roadmaps = db.roadmaps(u["id"], ("activo", "propuesto"))
+    from ..agents import roadmap as RM
+    plan_faltan = RM.habilidades_sin_plan(u) if perfil.get("estado") == "completo" and roadmaps else []
     recientes = [s for s in db.sesiones(usuario_id=u["id"], estado="completada", limite=5) if s["tipo"] in ("practica", "laboratorio")]
     niveles = db.niveles(u["id"])
     serie = metrics.serie_scores(u["id"])
     notif = db.notificaciones(u["id"], solo_no_leidas=True, limite=5)
     return render(request, "hoy.html", u, perfil=perfil, en_curso=en_curso, resumen=resumen, siguiente=siguiente, roadmaps=roadmaps, recientes=recientes,
                   niveles=niveles, serie=serie, notif=notif, habilidades=_habilidades(u), encuesta_pendiente=db.pendiente_encuesta(u["id"]),
-                  racha=db.racha_dias(u["id"]), hoy_act=db.actividad_hoy(u["id"]), micro_min=settings.MICRO_MINUTOS, micro_horas=settings.MICRO_HORAS)
+                  racha=db.racha_dias(u["id"]), plan_faltan=plan_faltan, hoy_act=db.actividad_hoy(u["id"]), micro_min=settings.MICRO_MINUTOS, micro_horas=settings.MICRO_HORAS)
 
 
 # ── diagnóstico con Elena ────────────────────────────────────────────────────
@@ -118,8 +120,11 @@ def diagnostico_repetir(request: Request, u: dict = Depends(colab), csrf: str = 
 # ── planes y catálogo ────────────────────────────────────────────────────────
 @router.get("/roadmaps")
 def roadmaps(request: Request, u: dict = Depends(colab)):
+    from ..agents import roadmap
     rms = db.roadmaps(u["id"])
-    return render(request, "roadmaps.html", u, roadmaps=rms, niveles=db.niveles(u["id"]), en_curso=db.sesion_en_curso(u["id"]), perfil=db.perfil(u["id"]))
+    perfil = db.perfil(u["id"])
+    plan = roadmap.resumen_plan_integral(u) if perfil.get("estado") == "completo" else None
+    return render(request, "roadmaps.html", u, roadmaps=rms, niveles=db.niveles(u["id"]), en_curso=db.sesion_en_curso(u["id"]), perfil=perfil, plan=plan)
 
 
 def _relevantes(u: dict, perfil: dict | None = None) -> tuple[list[dict], list[dict]]:
